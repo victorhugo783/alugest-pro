@@ -4,12 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AluGest Pro</title>
-    <!-- ── PWA ── -->
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#3b5bdb">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="AluGest Pro">
     <style>
         /* ─── LIGHT MODE (default) ─── */
         :root {
@@ -101,8 +95,6 @@
 
         body {
             font-family: var(--font);
-            font-size: 16px;
-            line-height: 1.5;
             background: var(--bg);
             color: var(--text);
             min-height: 100vh;
@@ -213,14 +205,14 @@
             background: transparent;
             border: none;
             color: var(--text);
-            font-size: 16px;
+            font-size: 14px;
             padding: 13px 4px 13px 0;
             outline: none;
             text-transform: uppercase;
             font-family: var(--font);
             letter-spacing: 0.3px;
         }
-        .search-bar input::placeholder { text-transform: none; color: var(--text3); font-size: 15px; }
+        .search-bar input::placeholder { text-transform: none; color: var(--text3); font-size: 13px; }
 
         .mic-btn {
             padding: 0 14px;
@@ -251,7 +243,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 15px;
+            font-size: 13px;
             cursor: pointer;
             border-bottom: 1px solid var(--border);
             transition: background 0.12s;
@@ -260,12 +252,12 @@
         .dropdown-item:last-child { border-bottom: none; }
         .dropdown-item:hover, .dropdown-item:active { background: var(--accent-dim); }
         .dropdown-item-name { font-weight: 600; color: var(--text); }
-        .dropdown-item-color { font-size: 13px; color: var(--text2); margin-top: 2px; }
+        .dropdown-item-color { font-size: 11px; color: var(--text2); margin-top: 2px; }
         .dropdown-item-price { 
             font-family: var(--mono); 
             font-weight: 600;
             color: var(--accent); 
-            font-size: 15px;
+            font-size: 13px;
             white-space: nowrap;
             flex-shrink: 0;
         }
@@ -277,7 +269,7 @@
             border: 1px solid var(--border2);
             color: var(--text);
             border-radius: var(--radius-sm);
-            font-size: 16px;
+            font-size: 14px;
             margin: 5px 0;
             outline: none;
             font-family: var(--font);
@@ -313,7 +305,7 @@
             border: none !important;
             box-shadow: none !important;
             color: var(--text);
-            font-size: 16px;
+            font-size: 14px;
             outline: none;
             margin: 0;
         }
@@ -326,7 +318,7 @@
             white-space: nowrap;
             overflow: hidden;
             z-index: 1;
-            font-size: 16px;
+            font-size: 14px;
             text-transform: uppercase;
             font-family: var(--font);
         }
@@ -337,7 +329,7 @@
             border: none;
             border-radius: var(--radius-sm);
             font-weight: 700;
-            font-size: 14px;
+            font-size: 12px;
             letter-spacing: 1.2px;
             text-transform: uppercase;
             background: var(--accent);
@@ -420,7 +412,7 @@
             background: none;
             border: none;
             color: var(--text3);
-            font-size: 12px;
+            font-size: 9px;
             cursor: pointer;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -499,7 +491,7 @@
         }
         .screen-title {
             font-family: var(--font);
-            font-size: 15px;
+            font-size: 13px;
             font-weight: 700;
             letter-spacing: 0.5px;
             color: var(--text);
@@ -534,13 +526,13 @@
         .cart-item:hover { border-color: var(--border2); }
         .cart-item-name {
             font-weight: 600;
-            font-size: 15px;
+            font-size: 13px;
             text-transform: uppercase;
             color: var(--text);
             letter-spacing: 0.2px;
         }
         .cart-item-color {
-            font-size: 13px;
+            font-size: 11px;
             color: var(--text2);
             text-transform: uppercase;
             margin-top: 3px;
@@ -562,7 +554,7 @@
         }
         .kit-fallback-badge {
             display: inline-block;
-            font-size: 11px;
+            font-size: 8px;
             font-family: var(--mono);
             letter-spacing: 0.4px;
             color: var(--text3);
@@ -576,7 +568,7 @@
         }
         .qty-controls { display: flex; align-items: center; gap: 6px; }
         .qty-val { 
-            font-weight: 600; font-size: 16px; min-width: 20px; 
+            font-weight: 600; font-size: 14px; min-width: 20px; 
             text-align: center; font-family: var(--mono); color: var(--text);
         }
 
@@ -585,7 +577,7 @@
             background: var(--surface3);
             border-radius: 6px;
             padding: 2px 7px;
-            font-size: 12px;
+            font-size: 9px;
             font-family: var(--mono);
             color: var(--text2);
             letter-spacing: 0.5px;
@@ -615,7 +607,7 @@
         .mat-card-name {
             font-family: var(--mono);
             font-weight: 600;
-            font-size: 15px;
+            font-size: 13px;
             color: var(--text);
             text-transform: uppercase;
             line-height: 1.4;
@@ -628,7 +620,7 @@
         }
         .mat-card-name:focus { border-color: var(--border2); background: var(--surface2); outline: none; }
         .mat-card-color {
-            font-size: 13px;
+            font-size: 11px;
             color: var(--accent2);
             text-transform: uppercase;
             font-weight: 600;
@@ -650,13 +642,13 @@
             margin-top: 5px;
         }
         .mat-alias-icon {
-            font-size: 13px;
+            font-size: 11px;
             flex-shrink: 0;
             opacity: 0.55;
         }
         .mat-alias-input {
             flex: 1;
-            font-size: 13px;
+            font-size: 10px;
             font-family: var(--mono);
             color: var(--text3);
             border: 1px dashed var(--border2);
@@ -676,7 +668,7 @@
         /* badge que aparece en resultados de búsqueda cuando coincide por alias */
         .alias-match-badge {
             display: inline-block;
-            font-size: 11px;
+            font-size: 8px;
             font-family: var(--mono);
             font-weight: 700;
             letter-spacing: 0.5px;
@@ -697,7 +689,7 @@
         }
         .price-old-badge {
             display: inline-block; background: rgba(220,38,38,0.1); color: var(--danger);
-            border-radius: 5px; padding: 1px 5px; font-size: 12px;
+            border-radius: 5px; padding: 1px 5px; font-size: 9px;
             font-family: var(--mono); margin-left: 5px; vertical-align: middle;
         }
         .dist-price-row {
@@ -709,7 +701,7 @@
         }
         .dist-price-row:last-child { border-bottom: none; }
         .dist-label {
-            font-size: 13px;
+            font-size: 10px;
             font-family: var(--mono);
             color: var(--text3);
             text-transform: uppercase;
@@ -717,7 +709,7 @@
         }
         .dist-price-row input {
             width: 95px; margin: 0; padding: 5px 9px;
-            text-align: right; font-size: 15px;
+            text-align: right; font-size: 13px;
             font-family: var(--mono);
             background: var(--surface3); border: 1px solid var(--border2);
             color: var(--text); border-radius: var(--radius-xs);
@@ -743,7 +735,7 @@
             border: 1px solid var(--border2);
             background: transparent;
             color: var(--text2);
-            font-size: 13px;
+            font-size: 11px;
             font-weight: 600;
             font-family: var(--mono);
             letter-spacing: 0.5px;
@@ -775,11 +767,11 @@
         }
         .hist-card:hover { border-color: var(--border2); }
         .hist-card:active { background: var(--surface2); }
-        .hist-client { font-weight: 600; font-size: 16px; text-transform: uppercase; letter-spacing: 0.2px; color: var(--text); }
-        .hist-meta { font-size: 13px; color: var(--text2); margin-top: 4px; font-family: var(--mono); }
+        .hist-client { font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.2px; color: var(--text); }
+        .hist-meta { font-size: 11px; color: var(--text2); margin-top: 4px; font-family: var(--mono); }
         .hist-folio {
             font-family: var(--mono);
-            font-size: 14px;
+            font-size: 12px;
             color: var(--accent);
             font-weight: 600;
             background: var(--accent-dim);
@@ -802,7 +794,7 @@
         }
         .empty-label {
             font-family: var(--mono);
-            font-size: 13px;
+            font-size: 11px;
             letter-spacing: 1.5px;
             text-transform: uppercase;
         }
@@ -811,7 +803,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            font-size: 13px;
+            font-size: 10px;
             font-family: var(--mono);
             color: var(--text2);
             letter-spacing: 1.5px;
@@ -827,7 +819,7 @@
         }
 
         .settings-label {
-            font-size: 13px;
+            font-size: 10px;
             font-family: var(--mono);
             font-weight: 600;
             letter-spacing: 1px;
@@ -842,12 +834,12 @@
             gap: 8px;
             align-items: center;
             margin-top: 6px;
-            font-size: 13px;
+            font-size: 11px;
             flex-wrap: wrap;
         }
         .edit-cat-controls select, .edit-cat-controls label {
             margin: 0; padding: 4px 8px;
-            font-size: 13px; width: auto;
+            font-size: 10px; width: auto;
         }
 
         .inline-row {
@@ -859,7 +851,7 @@
 
         .measure-group-field {
             margin-top: 6px;
-            font-size: 13px;
+            font-size: 10px;
             display: flex;
             align-items: center;
             gap: 8px;
@@ -882,7 +874,7 @@
             color: var(--text);
             padding: 10px 20px;
             border-radius: 20px;
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 600;
             font-family: var(--mono);
             letter-spacing: 0.5px;
@@ -908,7 +900,7 @@
             padding: 12px 14px;
             border-radius: var(--radius-sm);
             margin-bottom: 12px;
-            font-size: 13px;
+            font-size: 11px;
             font-weight: 700;
             text-align: center;
             display: none;
@@ -963,14 +955,14 @@
         }
         .info-block { flex: 1; min-width: 80px; }
         .info-label {
-            font-size: 13px;
+            font-size: 10px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.6px;
             color: #5b7c9c;
             margin-bottom: 3px;
         }
-        .info-value { font-weight: 700; font-size: 16px; color: #0f2b3b; }
+        .info-value { font-weight: 700; font-size: 14px; color: #0f2b3b; }
 
         .invoice-toolbar {
             background: #f1f5f9;
@@ -981,7 +973,7 @@
             flex-wrap: nowrap;
             align-items: center;
             gap: 12px;
-            font-size: 13px;
+            font-size: 10px;
             position: sticky;
             top: 0;
             z-index: 25;
@@ -999,7 +991,7 @@
             background: white;
             padding: 3px 8px;
             border-radius: 30px;
-            font-size: 12px;
+            font-size: 9px;
             color: #1e3a5f;
             white-space: nowrap;
         }
@@ -1008,7 +1000,7 @@
             border: 1px solid #cbd5e1;
             padding: 3px 10px;
             border-radius: 30px;
-            font-size: 13px;
+            font-size: 10px;
             font-weight: 600;
             font-family: monospace;
             cursor: pointer;
@@ -1023,7 +1015,7 @@
             border: none;
             padding: 3px 10px;
             border-radius: 30px;
-            font-size: 12px;
+            font-size: 9px;
             font-weight: 600;
             cursor: pointer;
             white-space: nowrap;
@@ -1031,12 +1023,12 @@
         }
 
         .invoice-table-wrapper { margin-bottom: 20px; border-radius: 12px; }
-        .invoice-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        .invoice-table { width: 100%; border-collapse: collapse; font-size: 12px; }
         .invoice-table th {
             text-align: left;
             padding: 10px 6px 8px;
             border-bottom: 1.5px solid #cbd5e1;
-            font-size: 13px;
+            font-size: 10px;
             text-transform: uppercase;
             letter-spacing: 0.8px;
             color: #000 !important;
@@ -1051,8 +1043,8 @@
             vertical-align: top;
             color: #000 !important;
         }
-        .product-name { font-weight: 700; font-size: 15px; color: #0f172a; }
-        .product-meta { font-size: 13px; color: #5b6e8c; margin-top: 2px; }
+        .product-name { font-weight: 700; font-size: 13px; color: #0f172a; }
+        .product-meta { font-size: 10px; color: #5b6e8c; margin-top: 2px; }
 
         /* ── Checklist interactivo en ticket ── */
         .inv-check-row { transition: opacity 0.2s, background 0.2s; }
@@ -1073,7 +1065,7 @@
             margin-top: 8px;
         }
         .invoice-total-amount { font-size: 22px; font-weight: 800; color: #0f2b3f; }
-        .invoice-subtotal-line { font-size: 13px; color: #4b6b8f; margin-top: 4px; }
+        .invoice-subtotal-line { font-size: 11px; color: #4b6b8f; margin-top: 4px; }
 
         .invoice-actions {
             padding: 16px 12px 24px;
@@ -1136,7 +1128,7 @@
             margin: 0;
             background: transparent;
             border: none;
-            font-size: 15px;
+            font-size: 13px;
             padding: 0;
             box-shadow: none;
         }
@@ -1146,7 +1138,7 @@
             padding: 11px 10px;
             border-radius: var(--radius-md);
             font-family: var(--mono);
-            font-size: 13px;
+            font-size: 11px;
             font-weight: 800;
             letter-spacing: 0.5px;
             cursor: pointer;
@@ -1159,7 +1151,7 @@
         .fab-btn-primary { background: transparent; border: 1.5px solid var(--border2); color: var(--text2); box-shadow: none; }
         .fab-btn-primary:active { background: var(--surface2); }
         /* LIMPIAR: visible pero sin ser rojo agresivo — surface sólido con ícono */
-        .fab-btn-danger { background: var(--surface2); border: 1.5px solid var(--border2); color: var(--text2); box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-size: 13px; flex: 0 0 auto; padding: 11px 16px; }
+        .fab-btn-danger { background: var(--surface2); border: 1.5px solid var(--border2); color: var(--text2); box-shadow: 0 2px 8px rgba(0,0,0,0.15); font-size: 10px; flex: 0 0 auto; padding: 11px 16px; }
         .fab-btn-danger:active { background: var(--surface); }
 
         #cart-subtotal {
@@ -1176,7 +1168,7 @@
             justify-content: space-between;
             align-items: baseline;
             padding: 4px 0;
-            font-size: 14px;
+            font-size: 12px;
             color: var(--text2);
             font-family: var(--mono);
         }
@@ -1184,7 +1176,7 @@
             border-top: 1px solid var(--border2);
             margin-top: 6px;
             padding-top: 8px;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 700;
             color: var(--accent);
         }
@@ -1198,7 +1190,7 @@
         }
         .subtotal-no-price {
             color: var(--danger);
-            font-size: 12px;
+            font-size: 9px;
             font-family: var(--mono);
             letter-spacing: 0.5px;
             margin-left: 4px;
@@ -1217,7 +1209,7 @@
             align-items: center;
             gap: 10px;
             font-family: var(--mono);
-            font-size: 13px;
+            font-size: 10px;
             letter-spacing: 1.5px;
             color: var(--text3);
             text-transform: uppercase;
@@ -1242,7 +1234,7 @@
             40%, 60% { transform: translateX(3px); }
         }
         .field-error-msg {
-            font-size: 13px;
+            font-size: 10px;
             color: var(--danger);
             font-family: var(--mono);
             letter-spacing: 0.5px;
@@ -1253,7 +1245,7 @@
 
         .price-date-hint {
             display: block;
-            font-size: 12px;
+            font-size: 9px;
             color: var(--text3);
             letter-spacing: 0.3px;
             margin-top: 1px;
@@ -1275,7 +1267,7 @@
         }
         .kit-select-label {
             font-family: var(--mono);
-            font-size: 13px;
+            font-size: 10px;
             font-weight: 700;
             letter-spacing: 1.5px;
             color: var(--accent);
@@ -1294,7 +1286,7 @@
             border: 1px solid var(--border2);
             color: var(--text);
             border-radius: var(--radius-sm);
-            font-size: 15px;
+            font-size: 13px;
             font-family: var(--font);
             font-weight: 600;
             text-transform: uppercase;
@@ -1319,7 +1311,7 @@
             color: #ffffff;
             border: none;
             border-radius: var(--radius-sm);
-            font-size: 13px;
+            font-size: 11px;
             font-weight: 800;
             letter-spacing: 0.8px;
             text-transform: uppercase;
@@ -1348,14 +1340,14 @@
         .kit-family-header:active { background: var(--accent-glow); }
         .kit-family-header-name {
             font-family: var(--mono);
-            font-size: 13px;
+            font-size: 11px;
             font-weight: 700;
             letter-spacing: 1.2px;
             color: var(--accent);
             text-transform: uppercase;
         }
         .kit-family-header-meta {
-            font-size: 13px;
+            font-size: 10px;
             color: var(--text3);
             font-family: var(--mono);
             margin-top: 2px;
@@ -1392,7 +1384,7 @@
             justify-content: flex-end;
             padding-right: 20px;
             color: #fff;
-            font-size: 13px;
+            font-size: 11px;
             font-family: var(--mono);
             font-weight: 700;
             letter-spacing: 0.5px;
@@ -1416,13 +1408,13 @@
         .kit-card-name {
             font-family: var(--mono);
             font-weight: 700;
-            font-size: 15px;
+            font-size: 13px;
             color: var(--text);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
         .kit-card-meta {
-            font-size: 13px;
+            font-size: 10px;
             color: var(--text3);
             margin-top: 3px;
             font-family: var(--mono);
@@ -1450,7 +1442,7 @@
         .kit-prod-row:last-child { border-bottom: none; }
         .kit-prod-info { flex: 1; min-width: 0; }
         .kit-prod-name {
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 600;
             color: var(--text);
             text-transform: uppercase;
@@ -1459,7 +1451,7 @@
             text-overflow: ellipsis;
         }
         .kit-prod-color {
-            font-size: 13px;
+            font-size: 10px;
             color: var(--text2);
             text-transform: uppercase;
         }
@@ -1475,7 +1467,7 @@
             text-align: center;
             font-family: var(--mono);
             font-weight: 700;
-            font-size: 15px;
+            font-size: 13px;
             background: var(--surface2);
             border: 1px solid var(--border2);
             color: var(--text);
@@ -1531,7 +1523,7 @@
         .kit-builder-prod-row:last-child { border-bottom: none; }
         .kit-builder-prod-name {
             flex: 1;
-            font-size: 13px;
+            font-size: 11px;
             font-weight: 600;
             color: var(--text);
             text-transform: uppercase;
@@ -1545,7 +1537,7 @@
             text-align: center;
             font-family: var(--mono);
             font-weight: 700;
-            font-size: 15px;
+            font-size: 13px;
             background: var(--surface2);
             border: 1px solid var(--border2);
             color: var(--text);
@@ -1582,7 +1574,7 @@
             right: calc(50% - 18px);
             background: var(--accent);
             color: #ffffff;
-            font-size: 11px;
+            font-size: 8px;
             font-weight: 800;
             font-family: var(--mono);
             padding: 1px 4px;
@@ -1603,7 +1595,7 @@
         }
         .calc-title {
             font-family: var(--mono);
-            font-size: 13px;
+            font-size: 10px;
             letter-spacing: 1.5px;
             color: var(--accent);
             text-transform: uppercase;
@@ -1627,10 +1619,10 @@
             justify-content: space-between;
             margin-bottom: 8px;
         }
-        .calc-item-name { font-weight: 700; font-size: 14px; color: var(--text); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .calc-item-name { font-weight: 700; font-size: 12px; color: var(--text); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .calc-item-remove { background:none; border:none; cursor:pointer; color:var(--danger); padding:4px; display:flex; align-items:center; flex-shrink:0; }
         .calc-item-inputs { display: flex; gap: 6px; }
-        .calc-item-inputs input { flex:1; margin:0; text-align:center; font-family:var(--mono); font-weight:700; font-size: 15px; padding:7px 6px; }
+        .calc-item-inputs input { flex:1; margin:0; text-align:center; font-family:var(--mono); font-weight:700; font-size:13px; padding:7px 6px; }
         .calc-item-result {
             margin-top: 8px;
             padding-top: 8px;
@@ -1638,9 +1630,9 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 13px;
+            font-size: 11px;
         }
-        .calc-item-meta { color: var(--text2); font-family: var(--mono); font-size: 13px; line-height: 1.6; }
+        .calc-item-meta { color: var(--text2); font-family: var(--mono); font-size: 10px; line-height: 1.6; }
         .calc-item-price { font-family: var(--mono); font-weight: 800; font-size: 16px; color: var(--accent); }
         .calc-add-row {
             display: flex;
@@ -1659,7 +1651,7 @@
         .calc-total-row {
             display: flex;
             justify-content: space-between;
-            font-size: 15px;
+            font-size: 13px;
             padding: 3px 0;
             color: var(--text2);
             font-family: var(--mono);
@@ -1681,10 +1673,10 @@
             gap: 8px;
             margin-bottom: 10px;
         }
-        .calc-margen-row label { font-size: 14px; color: var(--text2); white-space: nowrap; }
+        .calc-margen-row label { font-size: 12px; color: var(--text2); white-space: nowrap; }
         .calc-margen-row input { width: 80px; margin: 0; text-align: center; font-family: var(--mono); font-weight: 700; }
         .calc-merma-tag {
-            font-size: 13px;
+            font-size: 10px;
             font-family: var(--mono);
             padding: 2px 6px;
             border-radius: 4px;
@@ -1711,24 +1703,24 @@
             box-shadow: 0 20px 60px rgba(0,0,0,0.28), 0 1px 0 rgba(255,255,255,0.12) inset;
             animation: itemIn 0.18s ease both;
         }
-        .units-modal-title { font-family: var(--mono); font-size: 13px; letter-spacing: 1px; color: var(--text3); text-transform: uppercase; margin-bottom: 6px; }
+        .units-modal-title { font-family: var(--mono); font-size: 11px; letter-spacing: 1px; color: var(--text3); text-transform: uppercase; margin-bottom: 6px; }
         .units-modal-kit { font-size: 16px; font-weight: 800; color: var(--text); margin-bottom: 16px; line-height: 1.2; }
-        .units-modal-label { font-size: 14px; color: var(--text2); margin-bottom: 8px; }
+        .units-modal-label { font-size: 12px; color: var(--text2); margin-bottom: 8px; }
         .units-modal input { font-family: var(--mono); font-size: 28px; font-weight: 800; text-align: center; width: 100%; margin: 0 0 16px; padding: 10px; border-radius: var(--radius-sm); }
         .units-modal-btns { display: flex; gap: 8px; }
         .units-modal-btns button { flex: 1; }
         /* ── Insumos en kit-card ── */
         .kit-insumos-section { padding: 10px 14px 4px; border-top: 1px solid var(--border); margin-top: 4px; }
-        .kit-insumos-title { font-size: 12px; font-family: var(--mono); letter-spacing: 1px; color: var(--text3); text-transform: uppercase; margin-bottom: 8px; }
+        .kit-insumos-title { font-size: 9px; font-family: var(--mono); letter-spacing: 1px; color: var(--text3); text-transform: uppercase; margin-bottom: 8px; }
         .kit-insumo-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-        .kit-insumo-row input[type="text"] { flex: 1; margin: 0; font-size: 14px; padding: 6px 8px; }
-        .kit-insumo-row input[type="number"] { width: 58px; margin: 0; text-align: center; font-family: var(--mono); font-weight: 700; font-size: 15px; padding: 6px 4px; }
-        .kit-insumo-row .insumo-unit { font-size: 13px; color: var(--text3); font-family: var(--mono); white-space: nowrap; }
+        .kit-insumo-row input[type="text"] { flex: 1; margin: 0; font-size: 12px; padding: 6px 8px; }
+        .kit-insumo-row input[type="number"] { width: 58px; margin: 0; text-align: center; font-family: var(--mono); font-weight: 700; font-size: 13px; padding: 6px 4px; }
+        .kit-insumo-row .insumo-unit { font-size: 10px; color: var(--text3); font-family: var(--mono); white-space: nowrap; }
         .kit-insumo-del { background: none; border: none; cursor: pointer; color: var(--text3); padding: 4px; display: flex; align-items: center; border-radius: 6px; }
         .kit-insumo-del:active { color: var(--danger); }
         .kit-insumo-add-row { display: flex; gap: 6px; margin-top: 6px; align-items: center; }
-        .kit-insumo-add-row input[type="text"] { flex: 1; margin: 0; font-size: 14px; padding: 6px 8px; }
-        .kit-insumo-add-row input[type="number"] { width: 58px; margin: 0; text-align: center; font-family: var(--mono); font-weight: 700; font-size: 15px; padding: 6px 4px; }
+        .kit-insumo-add-row input[type="text"] { flex: 1; margin: 0; font-size: 12px; padding: 6px 8px; }
+        .kit-insumo-add-row input[type="number"] { width: 58px; margin: 0; text-align: center; font-family: var(--mono); font-weight: 700; font-size: 13px; padding: 6px 4px; }
         .kit-insumo-add-btn { background: var(--accent-dim); border: 1px solid var(--accent-glow); border-radius: var(--radius-xs); padding: 6px 12px; color: var(--accent); font-size: 16px; font-weight: 700; cursor: pointer; line-height: 1; flex-shrink: 0; }
         /* ── Checklist en ticket ── */
         .invoice-checklist {
@@ -1738,7 +1730,7 @@
             padding-top: 10px;
         }
         .invoice-checklist-title {
-            font-size: 12px;
+            font-size: 9px;
             font-weight: 800;
             letter-spacing: 2px;
             text-transform: uppercase;
@@ -1757,10 +1749,10 @@
         .invoice-checklist table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 14px;
+            font-size: 11.5px;
         }
         .invoice-checklist thead th {
-            font-size: 11px;
+            font-size: 8px;
             letter-spacing: 1px;
             text-transform: uppercase;
             color: #6b8caa;
@@ -1779,7 +1771,7 @@
         .invoice-checklist td:first-child {
             width: 28px;
             color: #6b8caa;
-            font-size: 15px;
+            font-size: 13px;
             text-align: center;
         }
         .invoice-checklist td.desc { font-weight: 500; }
@@ -1787,7 +1779,7 @@
             text-align: right;
             font-family: monospace;
             font-weight: 700;
-            font-size: 14px;
+            font-size: 12px;
             color: #0f2b3f;
             white-space: nowrap;
         }
@@ -1812,7 +1804,7 @@
             border-radius: 9px;
             background: transparent;
             color: var(--text3);
-            font-size: 13px;
+            font-size: 10px;
             font-weight: 700;
             font-family: var(--mono);
             letter-spacing: 0.8px;
@@ -1826,7 +1818,7 @@
             gap: 3px;
         }
         .sub-tab-btn .stab-sub {
-            font-size: 11px;
+            font-size: 8px;
             font-weight: 500;
             letter-spacing: 0.3px;
             text-transform: none;
@@ -1861,7 +1853,7 @@
         }
         .vid-row-num {
             font-family: var(--mono);
-            font-size: 13px;
+            font-size: 10px;
             font-weight: 700;
             color: var(--accent);
             width: 14px;
@@ -1870,7 +1862,7 @@
         }
         .vid-row-info { flex: 1; min-width: 0; overflow: hidden; }
         .vid-row-label {
-            font-size: 13px;
+            font-size: 11px;
             font-weight: 600;
             color: var(--text);
             white-space: nowrap;
@@ -1878,9 +1870,9 @@
             text-overflow: ellipsis;
             line-height: 1.2;
         }
-        .vid-row-label span { font-weight: 400; color: var(--text3); font-size: 13px; }
+        .vid-row-label span { font-weight: 400; color: var(--text3); font-size: 10px; }
         .vid-type-select {
-            font-size: 13px;
+            font-size: 11px;
             font-weight: 600;
             color: var(--text);
             background: var(--surface2);
@@ -1894,7 +1886,7 @@
         }
         .vid-row-sub {
             font-family: var(--mono);
-            font-size: 12px;
+            font-size: 9px;
             color: var(--text3);
             line-height: 1.2;
             white-space: nowrap;
@@ -1913,21 +1905,21 @@
             padding: 5px 4px !important;
             font-family: var(--mono) !important;
             font-weight: 700 !important;
-            font-size: 14px !important;
+            font-size: 12px !important;
             text-align: center !important;
             border-radius: var(--radius-xs) !important;
             flex-shrink: 0;
         }
         .vid-row-sep {
             font-family: var(--mono);
-            font-size: 13px;
+            font-size: 11px;
             color: var(--text3);
             flex-shrink: 0;
         }
         .vid-row-importe {
             font-family: var(--mono);
             font-weight: 800;
-            font-size: 15px;
+            font-size: 13px;
             color: var(--accent);
             white-space: nowrap;
             flex-shrink: 0;
@@ -1941,7 +1933,7 @@
         }
         .vid-row-del:active { color: var(--danger); }
         .vidcalc-merma-badge {
-            display: inline-block; font-size: 12px; font-family: var(--mono);
+            display: inline-block; font-size: 9px; font-family: var(--mono);
             padding: 1px 5px; border-radius: 4px;
             background: var(--surface3); color: var(--text3); margin-left: 3px;
         }
@@ -1957,14 +1949,14 @@
         .vidcalc-grand-total.visible { display: block; }
         .vidcalc-grand-row {
             display: flex; justify-content: space-between;
-            font-family: var(--mono); font-size: 14px; color: var(--text2); padding: 2px 0;
+            font-family: var(--mono); font-size: 12px; color: var(--text2); padding: 2px 0;
         }
         .vidcalc-grand-final {
             display: flex; justify-content: space-between; align-items: center;
             margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--accent-glow);
         }
         .vidcalc-grand-final span:first-child {
-            font-family: var(--mono); font-size: 15px; font-weight: 700;
+            font-family: var(--mono); font-size: 13px; font-weight: 700;
             color: var(--text); letter-spacing: 0.5px;
         }
         .vidcalc-grand-final span:last-child {
@@ -1973,7 +1965,7 @@
         .vidcalc-merma-badge.bad { background: rgba(255,83,112,0.1); color: var(--danger); }
 
         /* ══ PANTALLA: VENTA POR METRO ══ */
-        .ped-empty { text-align:center; padding:32px 16px; color:var(--text3); font-size: 15px; }
+        .ped-empty { text-align:center; padding:32px 16px; color:var(--text3); font-size:13px; }
 
         /* Cada fila de material */
         /* ── Perfil row: una sola línea compacta ── */
@@ -1992,7 +1984,7 @@
         }
         .ped-row-num {
             font-family: var(--mono);
-            font-size: 13px;
+            font-size: 10px;
             font-weight: 700;
             color: var(--accent);
             width: 14px;
@@ -2006,7 +1998,7 @@
             overflow: hidden;
         }
         .ped-row-label {
-            font-size: 13px;
+            font-size: 11px;
             font-weight: 600;
             color: var(--text);
             white-space: nowrap;
@@ -2017,12 +2009,12 @@
         .ped-row-label span {
             font-weight: 400;
             color: var(--text3);
-            font-size: 13px;
+            font-size: 10px;
         }
         /* Precio/metro — debajo del nombre, pequeño */
         .ped-row-pm {
             font-family: var(--mono);
-            font-size: 12px;
+            font-size: 9px;
             color: var(--text3);
             line-height: 1.2;
         }
@@ -2032,7 +2024,7 @@
             padding: 5px 4px !important;
             font-family: var(--mono) !important;
             font-weight: 700 !important;
-            font-size: 15px !important;
+            font-size: 13px !important;
             text-align: center !important;
             border-radius: var(--radius-xs) !important;
             flex-shrink: 0;
@@ -2040,7 +2032,7 @@
         .ped-row-importe {
             font-family: var(--mono);
             font-weight: 800;
-            font-size: 15px;
+            font-size: 13px;
             color: var(--accent);
             white-space: nowrap;
             flex-shrink: 0;
@@ -2073,7 +2065,7 @@
         }
         .ped-fallback-badge {
             display: inline-block;
-            font-size: 11px;
+            font-size: 8px;
             font-family: var(--mono);
             color: var(--text3);
             background: var(--surface2);
@@ -2089,7 +2081,7 @@
             display: flex;
             justify-content: space-between;
             font-family: var(--mono);
-            font-size: 13px;
+            font-size: 11px;
             color: var(--text3);
             padding: 3px 0;
             border-bottom: 1px solid var(--border);
@@ -2109,7 +2101,7 @@
             font-family: var(--mono);
         }
         .ped-total-grand span:first-child {
-            font-size: 15px;
+            font-size: 13px;
             font-weight: 700;
             color: var(--text);
             letter-spacing: 0.5px;
@@ -2186,7 +2178,7 @@
         }
         .cmp-option-label {
             font-family: var(--mono);
-            font-size: 12px;
+            font-size: 9px;
             font-weight: 700;
             letter-spacing: 1.5px;
             margin-bottom: 8px;
@@ -2201,7 +2193,7 @@
             border: 1px solid var(--border2);
             background: var(--surface2);
             color: var(--text);
-            font-size: 14px;
+            font-size: 12px;
             font-family: var(--mono);
             font-weight: 600;
         }
@@ -2215,7 +2207,7 @@
         .cmp-vs-line { flex: 1; height: 1px; background: var(--border2); }
         .cmp-vs-badge {
             font-family: var(--mono);
-            font-size: 13px;
+            font-size: 11px;
             font-weight: 800;
             color: var(--text3);
             letter-spacing: 2px;
@@ -2241,7 +2233,7 @@
         .cmp-total-b { background: rgba(224,92,0,0.07); border-color: rgba(224,92,0,0.2); }
         .cmp-total-label {
             font-family: var(--mono);
-            font-size: 11px;
+            font-size: 8px;
             letter-spacing: 1.5px;
             font-weight: 700;
             margin-bottom: 4px;
@@ -2249,7 +2241,7 @@
         .cmp-total-a .cmp-total-label { color: var(--accent); }
         .cmp-total-b .cmp-total-label { color: #e05c00; }
         .cmp-total-name {
-            font-size: 12px;
+            font-size: 9px;
             font-family: var(--mono);
             color: var(--text3);
             margin-bottom: 6px;
@@ -2278,21 +2270,21 @@
         }
         .cmp-diff-label {
             font-family: var(--mono);
-            font-size: 11px;
+            font-size: 8px;
             letter-spacing: 1.2px;
             color: var(--text3);
             margin-bottom: 4px;
         }
         .cmp-diff-amount {
             font-family: var(--mono);
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 800;
             color: var(--text);
         }
         .cmp-diff-amount.cheaper { color: var(--success); }
         .cmp-breakdown-title {
             font-family: var(--mono);
-            font-size: 12px;
+            font-size: 9px;
             font-weight: 700;
             letter-spacing: 1.5px;
             color: var(--text3);
@@ -2309,7 +2301,7 @@
         .cmp-row-header {
             grid-column: 1 / -1;
             font-family: var(--mono);
-            font-size: 12px;
+            font-size: 9px;
             font-weight: 700;
             letter-spacing: 1px;
             color: var(--text3);
@@ -2328,21 +2320,21 @@
         .cmp-cell.absent { background: var(--surface2); border-style: dashed; opacity: 0.55; }
         .cmp-cell-name {
             font-family: var(--mono);
-            font-size: 13px;
+            font-size: 10px;
             font-weight: 700;
             color: var(--text);
             line-height: 1.3;
             margin-bottom: 3px;
         }
         .cmp-cell-color {
-            font-size: 12px;
+            font-size: 9px;
             color: var(--text3);
             font-family: var(--mono);
             margin-bottom: 5px;
         }
         .cmp-cell-price {
             font-family: var(--mono);
-            font-size: 15px;
+            font-size: 13px;
             font-weight: 800;
             color: var(--text);
         }
@@ -2350,7 +2342,7 @@
         .cmp-cell.highlight-b .cmp-cell-price { color: #e05c00; }
         .cmp-cell-absent-label {
             font-family: var(--mono);
-            font-size: 12px;
+            font-size: 9px;
             color: var(--text3);
             font-style: italic;
         }
@@ -5989,15 +5981,6 @@ function cmpRender() {
             row.innerHTML = cellA + cellB;
             breakdown.appendChild(row);
         });
-    });
-}
-
-// ── Registrar Service Worker (PWA) ──
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js')
-            .then(reg => console.log('[PWA] SW registrado:', reg.scope))
-            .catch(err => console.warn('[PWA] SW falló:', err));
     });
 }
 
