@@ -2375,12 +2375,23 @@
     </style>
 </head>
 <body>
+<!-- ── SPLASH (visible mientras Firebase verifica sesión) ── -->
+<div id="splash-screen" style="
+    position:fixed;inset:0;z-index:99999;
+    background:#111827;
+    display:flex;align-items:center;justify-content:center;
+">
+    <svg width="72" height="72" viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">
+        <rect width="72" height="72" rx="16" fill="#3b5bdb"/>
+        <text x="36" y="50" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="28" fill="white">AG</text>
+    </svg>
+</div>
 
 <!-- ── PANTALLA DE LOGIN ── -->
 <div id="login-screen" style="
     position:fixed;inset:0;z-index:9999;
     background:#111827;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    display:none;flex-direction:column;align-items:center;justify-content:center;
     padding:32px 24px;font-family:system-ui,sans-serif;
 ">
     <div style="margin-bottom:12px"><svg width="72" height="72" viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg"><rect width="72" height="72" rx="16" fill="#3b5bdb"/><text x="36" y="50" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="28" fill="white">AG</text></svg></div>
@@ -6194,6 +6205,7 @@ async function fbLoadHistorial(uid) {
 _auth.onAuthStateChanged(async (user) => {
     const loginScreen = document.getElementById('login-screen');
     const appMain     = document.getElementById('app-main');
+    const splash      = document.getElementById('splash-screen');
     if (user) {
         _fbIsAdmin = (user.email === ADMIN_EMAIL);
         // Cargar datos de Firestore
@@ -6202,6 +6214,7 @@ _auth.onAuthStateChanged(async (user) => {
         // Guardar en localStorage como respaldo
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         // Mostrar app
+        splash.style.display = 'none';
         loginScreen.style.display = 'none';
         appMain.style.display = 'block';
         if (!_fbLoaded) {
@@ -6228,6 +6241,7 @@ _auth.onAuthStateChanged(async (user) => {
         }, 500);
     } else {
         // No logueado — mostrar login
+        splash.style.display = 'none';
         loginScreen.style.display = 'flex';
         loginScreen.style.flexDirection = 'column';
         appMain.style.display = 'none';
