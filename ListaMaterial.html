@@ -2934,7 +2934,7 @@
         <span class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
         Config
     </button>
-    <button data-tab="admin" id="nav-btn-admin" class="nav-btn" onclick="navigate('screen-admin',this)" style="display:none;position:relative">
+    <button data-tab="admin" id="nav-btn-admin" class="nav-btn" onclick="navigate('screen-admin',this)" style="position:relative">
         <span class="nav-icon" style="position:relative">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             <span id="admin-badge" style="display:none;position:absolute;top:-4px;right:-6px;background:#ef4444;color:#fff;border-radius:50%;width:16px;height:16px;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;font-family:var(--mono)">!</span>
@@ -6435,6 +6435,8 @@ _auth.onAuthStateChanged(async (user) => {
     if (user) {
         _currentUser = user;
         _fbIsAdmin = (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
+        // Ocultar admin tab si no es admin
+        if (!_fbIsAdmin) { var nb=document.getElementById('nav-btn-admin'); if(nb) nb.style.display='none'; }
         // Cargar datos de Firestore
         await fbLoadCatalogo();
         await fbLoadHistorial(user.uid);
@@ -6451,11 +6453,7 @@ _auth.onAuthStateChanged(async (user) => {
             renderAllScreens();
             renderKitsScreen();
         }
-        // Mostrar tab Admin solo al admin
-        setTimeout(() => {
-            const adminBtn = document.getElementById('nav-btn-admin');
-            if (adminBtn) adminBtn.style.display = _fbIsAdmin ? 'flex' : 'none';
-        }, 300);
+        // Tab Admin visible por CSS, oculto por JS para no-admins
         // Agregar botón de cerrar sesión en Config si no existe
         setTimeout(() => {
             if (!document.getElementById('btn-signout')) {
