@@ -6124,18 +6124,59 @@ function cmpRender() {
 
 // ══════════════════════════════════════════════
 //  MÓDULO DE ANALÍTICA + NOTIFICACIONES ADMIN
-//  (declarado aquí para que exista antes del observer)
+//  v2 — Validación por role en Firestore (no por email)
 // ══════════════════════════════════════════════
 
-const VAPID_KEY = 'BOpvgRh_GAoyx39_SniYmUBlt7Yw6-xWqJga8A23nq3GGIVEB610fjmPAz3TDZkBRZ1TcxjeMO9qLxdMNkM3x0E';
-let _messaging = null;
-let _sessionStart = Date.now();
-let _sessionRef = null;
-let _currentUser = null;
+const VAPID_KEY    = 'BOpvgRh_GAoyx39_SniYmUBlt7Yw6-xWqJga8A23nq3GGIVEB610fjmPAz3TDZkBRZ1TcxjeMO9qLxdMNkM3x0E';
+const ADMIN_EMAIL  = 'garciachavezvictorhugo0@gmail.com';
+
+let _messaging         = null;
+let _sessionStart      = Date.now();
+let _sessionRef        = null;
+let _currentUser       = null;
+let _fbIsAdmin         = false;   // fuente de verdad: Firestore role, NO email
+let _fbLoaded          = false;
 let _adminUnsubscribes = [];
 
-// ── Inicializar FCM para un usuario ──
+// ─────────────────────────────────────────────
+//  1. VALIDACIÓN DE ROL — consulta Firestore
+//     Devuelve true solo si role === 'admin'
+// ─────────────────────────────────────────────
+async function verificarRolAdmin(uid) {
+    try {
+        const snap = await _db.collection('usuarios').doc(uid).get();
+        if (!snap.exists) return false;
+        return snap.data()?.role === 'admin';
+    } catch (e) {
+        console.warn('[Auth] No se pudo verificar rol:', e.message);
+        return false;
+    }
+}
+
+// ─────────────────────────────────────────────
+//  2. VISIBILIDAD DEL PANEL ADMIN
+// ─────────────────────────────────────────────
+function aplicarVisibilidadAdmin(esAdmin) {
+    const navBtn = document.getElementById('nav-btn-admin');
+    const screen = document.getElementById('screen-admin');
+    if (esAdmin) {
+        if (navBtn) navBtn.style.display = '';
+        if (screen) screen.style.display = '';
+    } else {
+        if (navBtn) navBtn.style.display = 'none';
+        if (screen) screen.style.display = 'none';
+    }
+}
+
+// ─────────────────────────────────────────────
+//  3. FCM — solo en entorno seguro (HTTPS / localhost)
+// ─────────────────────────────────────────────
 async function initFCM(user) {
+    const esSeguro = location.protocol === 'https:' || location.hostname === 'localhost';
+    if (!esSeguro || !('Notification' in window) || !('serviceWorker' in navigator)) {
+        console.info('[FCM] Entorno no compatible — notificaciones omitidas');
+        return;
+    }
     try {
         _messaging = firebase.messaging();
         const permission = await Notification.requestPermission();
@@ -6148,19 +6189,24 @@ async function initFCM(user) {
             email: user.email,
             lastTokenUpdate: Date.now()
         }, { merge: true });
-        if (user.email === ADMIN_EMAIL) {
-            await _db.collection('admin').doc('config').set({
-                adminToken: token, updatedAt: Date.now()
-            }, { merge: true });
+        if (_fbIsAdmin) {
+            await _db.collection('admin').doc('config').set(
+                { adminToken: token, updatedAt: Date.now() },
+                { merge: true }
+            );
         }
         _messaging.onMessage((payload) => {
             const { title, body } = payload.notification || {};
             if (title) showAdminNotification(title, body || '');
         });
-    } catch(e) { console.warn('[FCM] No se pudo inicializar:', e.message); }
+    } catch (e) {
+        console.warn('[FCM] No se pudo inicializar:', e.message);
+    }
 }
 
-// ── Registrar sesión activa en Firestore ──
+// ─────────────────────────────────────────────
+//  4. SESIONES — registro de actividad
+// ─────────────────────────────────────────────
 async function registrarSesion(user) {
     _sessionStart = Date.now();
     const sessionId = `${user.uid}_${_sessionStart}`;
@@ -6171,14 +6217,11 @@ async function registrarSesion(user) {
             email: user.email, inicio: _sessionStart,
             ultimaActividad: _sessionStart, activo: true, eventos: []
         });
-    } catch(e) { console.warn('[Sesión] Error:', e); return; }
-    window.addEventListener('beforeunload', () => cerrarSesion());
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden) actualizarActividad(false);
-        else actualizarActividad(true);
-    });
+    } catch (e) { console.warn('[Sesión] Error registrando sesión:', e.message); return; }
+    window.addEventListener('beforeunload', cerrarSesion);
+    document.addEventListener('visibilitychange', () => actualizarActividad(!document.hidden));
     setInterval(() => { if (!document.hidden) actualizarActividad(true); }, 60000);
-    if (user.email !== ADMIN_EMAIL) {
+    if (!_fbIsAdmin) {
         try {
             await _db.collection('notificaciones_admin').add({
                 tipo: 'conexion',
@@ -6186,38 +6229,42 @@ async function registrarSesion(user) {
                 uid: user.uid, nombre: user.displayName || user.email,
                 timestamp: Date.now(), leida: false
             });
-        } catch(e) {}
+        } catch (e) { /* sin acceso — falla silenciosa */ }
     }
 }
 
 async function actualizarActividad(activo) {
     if (!_sessionRef) return;
-    try { await _sessionRef.update({ ultimaActividad: Date.now(), activo }); } catch(e) {}
+    try { await _sessionRef.update({ ultimaActividad: Date.now(), activo }); } catch (e) {}
 }
 
 async function cerrarSesion() {
     if (!_sessionRef) return;
     try {
-        const duracion = Math.round((Date.now() - _sessionStart) / 1000);
-        await _sessionRef.update({ activo: false, fin: Date.now(), duracionSegundos: duracion });
-    } catch(e) {}
+        await _sessionRef.update({
+            activo: false, fin: Date.now(),
+            duracionSegundos: Math.round((Date.now() - _sessionStart) / 1000)
+        });
+    } catch (e) {}
 }
 
 async function trackEvento(tipo, detalle) {
-    if (!_sessionRef || !_currentUser) return;
-    if (_currentUser.email === ADMIN_EMAIL) return;
+    if (!_sessionRef || !_currentUser || _fbIsAdmin) return;
     try {
         await _sessionRef.update({
             eventos: firebase.firestore.FieldValue.arrayUnion({ tipo, detalle, ts: Date.now() }),
             ultimaActividad: Date.now()
         });
-    } catch(e) {}
+    } catch (e) {}
 }
 
+// ─────────────────────────────────────────────
+//  5. NOTIFICACIONES IN-APP
+// ─────────────────────────────────────────────
 function showAdminNotification(titulo, cuerpo) {
     const notif = document.createElement('div');
     notif.style.cssText = `position:fixed;top:16px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;border-radius:var(--radius-md);padding:12px 20px;z-index:99999;font-family:var(--mono);font-size:13px;font-weight:700;box-shadow:0 4px 20px rgba(0,0,0,0.3);max-width:320px;text-align:center;animation:screenIn 0.3s ease;`;
-    notif.innerHTML = `<div style="font-size:11px;opacity:0.85;margin-bottom:3px">📢 ALUGEST</div><div>${titulo}</div>${cuerpo?`<div style="font-weight:400;font-size:11px;margin-top:3px;opacity:0.9">${cuerpo}</div>`:''}`;
+    notif.innerHTML = `<div style="font-size:11px;opacity:0.85;margin-bottom:3px">📢 ALUGEST</div><div>${titulo}</div>${cuerpo ? `<div style="font-weight:400;font-size:11px;margin-top:3px;opacity:0.9">${cuerpo}</div>` : ''}`;
     document.body.appendChild(notif);
     setTimeout(() => notif.remove(), 6000);
 }
@@ -6226,13 +6273,12 @@ function escucharBroadcasts(user) {
     const unsub = _db.collection('broadcasts').orderBy('timestamp', 'desc').limit(1)
         .onSnapshot(snap => {
             snap.docChanges().forEach(change => {
-                if (change.type === 'added') {
-                    const d = change.doc.data();
-                    if (d.timestamp > Date.now() - 5*60*1000 && d.uid !== user.uid) {
-                        showAdminNotification(d.titulo || 'AluGest', d.mensaje || '');
-                        if (Notification.permission === 'granted') {
-                            new Notification(d.titulo || 'AluGest Pro', { body: d.mensaje, icon: './icon-192.png' });
-                        }
+                if (change.type !== 'added') return;
+                const d = change.doc.data();
+                if (d.timestamp > Date.now() - 5 * 60 * 1000 && d.uid !== user.uid) {
+                    showAdminNotification(d.titulo || 'AluGest', d.mensaje || '');
+                    if (Notification.permission === 'granted') {
+                        new Notification(d.titulo || 'AluGest Pro', { body: d.mensaje, icon: './icon-192.png' });
                     }
                 }
             });
@@ -6240,7 +6286,11 @@ function escucharBroadcasts(user) {
     _adminUnsubscribes.push(unsub);
 }
 
+// ─────────────────────────────────────────────
+//  6. FUNCIONES EXCLUSIVAS DE ADMIN
+// ─────────────────────────────────────────────
 async function adminSendBroadcast() {
+    if (!_fbIsAdmin) return;
     const input = document.getElementById('admin-msg-input');
     const msg = (input?.value || '').trim();
     if (!msg) { showToast('Escribe un mensaje primero', 'info'); return; }
@@ -6251,31 +6301,31 @@ async function adminSendBroadcast() {
         });
         input.value = '';
         showToast('✓ Mensaje enviado a todos los usuarios', 'success');
-    } catch(e) { showToast('Error: ' + e.message, 'info'); }
+    } catch (e) { showToast('Error: ' + e.message, 'info'); }
 }
 
 function adminCargarOnline() {
+    if (!_fbIsAdmin) return;
     _adminUnsubscribes.forEach(u => u());
     _adminUnsubscribes = [];
-    const hace5min = Date.now() - 5*60*1000;
+    const hace5min = Date.now() - 5 * 60 * 1000;
     const unsub = _db.collection('sesiones')
         .where('activo', '==', true).where('ultimaActividad', '>', hace5min)
         .onSnapshot(snap => {
             const el = document.getElementById('admin-online-list');
             if (!el) return;
             const docs = snap.docs.filter(d => d.data().email !== ADMIN_EMAIL);
+            const badge = document.getElementById('admin-badge');
             if (!docs.length) {
                 el.innerHTML = `<div style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:12px 0">Ningún usuario conectado ahora</div>`;
-                const badge = document.getElementById('admin-badge');
                 if (badge) badge.style.display = 'none';
                 return;
             }
-            const badge = document.getElementById('admin-badge');
             if (badge) { badge.style.display = 'flex'; badge.textContent = docs.length; }
             el.innerHTML = docs.map(d => {
                 const s = d.data();
                 const min = Math.round((Date.now() - s.inicio) / 60000);
-                const dur = min < 60 ? `${min} min` : `${Math.floor(min/60)}h ${min%60}m`;
+                const dur = min < 60 ? `${min} min` : `${Math.floor(min / 60)}h ${min % 60}m`;
                 return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
                     <span style="width:9px;height:9px;border-radius:50%;background:#16a34a;flex-shrink:0;box-shadow:0 0 0 2px rgba(22,163,74,0.3);animation:pulse 2s infinite"></span>
                     <div style="flex:1;min-width:0">
@@ -6288,46 +6338,56 @@ function adminCargarOnline() {
 }
 
 async function adminCargarActividad() {
+    if (!_fbIsAdmin) return;
     const el = document.getElementById('admin-activity-list');
     if (!el) return;
-    const hace7dias = Date.now() - 7*24*60*60*1000;
+    const hace7dias = Date.now() - 7 * 24 * 60 * 60 * 1000;
     try {
         const snap = await _db.collection('sesiones').where('inicio', '>', hace7dias).orderBy('inicio', 'desc').limit(30).get();
         const sesiones = snap.docs.map(d => d.data()).filter(d => d.email !== ADMIN_EMAIL);
-        if (!sesiones.length) { el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Sin actividad esta semana</div>`; return; }
+        if (!sesiones.length) {
+            el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Sin actividad esta semana</div>`;
+            return;
+        }
         const funcCount = {};
-        sesiones.forEach(s => (s.eventos||[]).forEach(ev => { funcCount[ev.tipo] = (funcCount[ev.tipo]||0)+1; }));
+        sesiones.forEach(s => (s.eventos || []).forEach(ev => { funcCount[ev.tipo] = (funcCount[ev.tipo] || 0) + 1; }));
         const statsEl = document.getElementById('admin-stats-chart');
         if (statsEl && Object.keys(funcCount).length) {
             const max = Math.max(...Object.values(funcCount));
-            const labels = { 'busqueda':'🔍 Búsqueda','kit_cargado':'📦 Kit cargado','cotizacion':'📄 Cotización','ventas':'🛒 Ventas','pedidos':'📋 Pedidos','comparar':'⚖️ Comparar' };
-            statsEl.innerHTML = Object.entries(funcCount).sort((a,b)=>b[1]-a[1]).map(([k,v]) => `
+            const labels = { 'busqueda': '🔍 Búsqueda', 'kit_cargado': '📦 Kit cargado', 'cotizacion': '📄 Cotización', 'ventas': '🛒 Ventas', 'pedidos': '📋 Pedidos', 'comparar': '⚖️ Comparar' };
+            statsEl.innerHTML = Object.entries(funcCount).sort((a, b) => b[1] - a[1]).map(([k, v]) => `
                 <div style="margin-bottom:8px">
-                    <div style="display:flex;justify-content:space-between;font-size:11px;font-family:var(--mono);color:var(--text2);margin-bottom:3px"><span>${labels[k]||k}</span><span>${v}x</span></div>
-                    <div style="height:6px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:${Math.round(v/max*100)}%;background:var(--accent);border-radius:4px"></div></div>
+                    <div style="display:flex;justify-content:space-between;font-size:11px;font-family:var(--mono);color:var(--text2);margin-bottom:3px"><span>${labels[k] || k}</span><span>${v}x</span></div>
+                    <div style="height:6px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:${Math.round(v / max * 100)}%;background:var(--accent);border-radius:4px"></div></div>
                 </div>`).join('');
-        } else if (statsEl) { statsEl.innerHTML = `<div style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:12px 0">Sin datos de uso aún</div>`; }
-        el.innerHTML = sesiones.slice(0,15).map(s => {
-            const dur = s.duracionSegundos ? (s.duracionSegundos<60?`${s.duracionSegundos}s`:s.duracionSegundos<3600?`${Math.round(s.duracionSegundos/60)}min`:`${Math.floor(s.duracionSegundos/3600)}h ${Math.round((s.duracionSegundos%3600)/60)}min`) : (s.activo?'En línea':'—');
-            const fecha = new Date(s.inicio).toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-            const funcs = [...new Set((s.eventos||[]).map(e=>e.tipo))].join(', ')||'—';
+        } else if (statsEl) {
+            statsEl.innerHTML = `<div style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:12px 0">Sin datos de uso aún</div>`;
+        }
+        el.innerHTML = sesiones.slice(0, 15).map(s => {
+            const ds = s.duracionSegundos;
+            const dur = ds ? (ds < 60 ? `${ds}s` : ds < 3600 ? `${Math.round(ds / 60)}min` : `${Math.floor(ds / 3600)}h ${Math.round((ds % 3600) / 60)}min`) : (s.activo ? 'En línea' : '—');
+            const fecha = new Date(s.inicio).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+            const funcs = [...new Set((s.eventos || []).map(e => e.tipo))].join(', ') || '—';
             return `<div class="card" style="margin-bottom:6px;padding:10px 12px">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px"><span style="font-weight:700;font-size:13px;color:var(--text)">${s.nombre}</span><span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${dur}</span></div>
                 <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:3px">${fecha}</div>
-                ${funcs!=='—'?`<div style="font-size:10px;color:var(--accent);font-family:var(--mono)">Usó: ${funcs}</div>`:''}
+                ${funcs !== '—' ? `<div style="font-size:10px;color:var(--accent);font-family:var(--mono)">Usó: ${funcs}</div>` : ''}
             </div>`;
         }).join('');
-    } catch(e) { el.innerHTML = `<div class="card" style="color:var(--danger);font-size:12px;padding:14px">Error: ${e.message}</div>`; }
+    } catch (e) {
+        el.innerHTML = `<div class="card" style="color:var(--danger);font-size:12px;padding:14px">Error al cargar actividad: ${e.message}</div>`;
+    }
 }
 
 function adminEscucharNotifs() {
-    const unsub = _db.collection('notificaciones_admin').where('leida','==',false)
+    if (!_fbIsAdmin) return;
+    const unsub = _db.collection('notificaciones_admin').where('leida', '==', false)
         .onSnapshot(snap => {
             if (!snap.empty) {
                 const badge = document.getElementById('admin-badge');
-                if (badge) { badge.style.display='flex'; badge.textContent=snap.size; }
-                const last = snap.docs[snap.docs.length-1]?.data();
-                if (last && last.timestamp > Date.now()-10000) showToast('🟢 '+last.mensaje,'success');
+                if (badge) { badge.style.display = 'flex'; badge.textContent = snap.size; }
+                const last = snap.docs[snap.docs.length - 1]?.data();
+                if (last && last.timestamp > Date.now() - 10000) showToast('🟢 ' + last.mensaje, 'success');
             }
         }, () => {});
     _adminUnsubscribes.push(unsub);
@@ -6337,10 +6397,6 @@ function adminEscucharNotifs() {
 //  FIREBASE — Auth + Sincronización
 // ══════════════════════════════════════════════
 
-// Email del administrador — solo este usuario puede editar el catálogo
-const ADMIN_EMAIL = 'garciachavezvictorhugo0@gmail.com'; // ← tu correo de Google
-let _fbIsAdmin = false;
-let _fbLoaded = false;
 
 function showLoginError(msg) {
     const el = document.getElementById('login-error');
@@ -6365,12 +6421,12 @@ async function doLogin() {
     btn.textContent = 'ENTRANDO...'; btn.disabled = true;
     try {
         await _auth.signInWithEmailAndPassword(email, pass);
-    } catch(e) {
+    } catch (e) {
         btn.textContent = 'ENTRAR'; btn.disabled = false;
         const msgs = {
-            'auth/user-not-found': 'No existe una cuenta con ese correo',
-            'auth/wrong-password': 'Contraseña incorrecta',
-            'auth/invalid-email': 'Correo inválido',
+            'auth/user-not-found':    'No existe una cuenta con ese correo',
+            'auth/wrong-password':    'Contraseña incorrecta',
+            'auth/invalid-email':     'Correo inválido',
             'auth/too-many-requests': 'Demasiados intentos, espera un momento'
         };
         showLoginError(msgs[e.code] || 'Error al iniciar sesión');
@@ -6386,11 +6442,11 @@ async function doRegister() {
         const cred = await _auth.createUserWithEmailAndPassword(email, pass);
         await cred.user.updateProfile({ displayName: name });
         showToast('✓ Cuenta creada, bienvenido ' + name);
-    } catch(e) {
+    } catch (e) {
         const msgs = {
             'auth/email-already-in-use': 'Ya existe una cuenta con ese correo',
-            'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres',
-            'auth/invalid-email': 'Correo inválido'
+            'auth/weak-password':        'La contraseña debe tener al menos 6 caracteres',
+            'auth/invalid-email':        'Correo inválido'
         };
         showLoginError(msgs[e.code] || 'Error al crear cuenta');
     }
@@ -6400,7 +6456,6 @@ function fbSignOut() {
     if (confirm('¿Cerrar sesión?')) _auth.signOut();
 }
 
-// Cargar catálogo compartido desde Firestore
 async function fbLoadCatalogo() {
     try {
         const doc = await _db.collection('catalogo').doc('main').get();
@@ -6411,41 +6466,49 @@ async function fbLoadCatalogo() {
             if (d.kits)         data.kits          = d.kits;
             if (d.ventasConfig) data.ventasConfig   = d.ventasConfig;
         }
-    } catch(e) { console.warn('Sin conexión, usando catálogo local'); }
+    } catch (e) { console.warn('Sin conexión, usando catálogo local'); }
 }
 
-// Cargar historial personal desde Firestore
 async function fbLoadHistorial(uid) {
     try {
         const doc = await _db.collection('usuarios').doc(uid).get();
         if (doc.exists) {
             const d = doc.data();
-            if (d.history)          data.history          = d.history;
-            if (d.ventaHistory)     data.ventaHistory      = d.ventaHistory;
-            if (d.lastBackupCount)  data.lastBackupCount   = d.lastBackupCount;
+            if (d.history)         data.history         = d.history;
+            if (d.ventaHistory)    data.ventaHistory     = d.ventaHistory;
+            if (d.lastBackupCount) data.lastBackupCount  = d.lastBackupCount;
         }
-    } catch(e) { console.warn('Sin conexión, usando historial local'); }
+    } catch (e) { console.warn('Sin conexión, usando historial local'); }
 }
 
-// Observer de autenticación — punto de entrada principal
+// ─────────────────────────────────────────────
+//  OBSERVER PRINCIPAL — punto de entrada
+//  Flujo: Auth → verificarRol → UI → analytics
+// ─────────────────────────────────────────────
 _auth.onAuthStateChanged(async (user) => {
     const loginScreen = document.getElementById('login-screen');
     const appMain     = document.getElementById('app-main');
     const splash      = document.getElementById('splash-screen');
+
     if (user) {
         _currentUser = user;
-        _fbIsAdmin = (user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
-        // Ocultar admin tab si no es admin
-        if (!_fbIsAdmin) { var nb=document.getElementById('nav-btn-admin'); if(nb) nb.style.display='none'; }
-        // Cargar datos de Firestore
+
+        // ① Verificar rol desde Firestore — ANTES de mostrar la app
+        _fbIsAdmin = await verificarRolAdmin(user.uid);
+
+        // ② Aplicar visibilidad del panel según el rol confirmado
+        aplicarVisibilidadAdmin(_fbIsAdmin);
+
+        // ③ Cargar datos de Firestore
         await fbLoadCatalogo();
         await fbLoadHistorial(user.uid);
-        // Guardar en localStorage como respaldo
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        // Mostrar app
-        splash.style.display = 'none';
+
+        // ④ Mostrar app
+        splash.style.display      = 'none';
         loginScreen.style.display = 'none';
-        appMain.style.display = 'block';
+        appMain.style.display     = 'block';
+
         if (!_fbLoaded) {
             _fbLoaded = true;
             init();
@@ -6453,8 +6516,8 @@ _auth.onAuthStateChanged(async (user) => {
             renderAllScreens();
             renderKitsScreen();
         }
-        // Tab Admin visible por CSS, oculto por JS para no-admins
-        // Agregar botón de cerrar sesión en Config si no existe
+
+        // ⑤ Botón cerrar sesión en Config
         setTimeout(() => {
             if (!document.getElementById('btn-signout')) {
                 const configScreen = document.getElementById('screen-config');
@@ -6469,8 +6532,9 @@ _auth.onAuthStateChanged(async (user) => {
                 }
             }
         }, 500);
-        // Iniciar sistema de analítica + FCM
-        setTimeout(async () => {
+
+        // ⑥ Analytics + FCM — no bloquea la UI, _fbIsAdmin ya está definido
+        (async () => {
             try {
                 await initFCM(user);
                 await registrarSesion(user);
@@ -6480,21 +6544,26 @@ _auth.onAuthStateChanged(async (user) => {
                     adminCargarActividad();
                     adminEscucharNotifs();
                 }
-            } catch(e) { console.warn('[Analytics] Error init:', e); }
-        }, 1000);
+            } catch (e) {
+                console.warn('[Analytics] Error al inicializar:', e.message);
+            }
+        })();
+
     } else {
         _currentUser = null;
-        // Limpiar sesión activa
+        _fbIsAdmin   = false;
         cerrarSesion();
         _adminUnsubscribes.forEach(u => u());
         _adminUnsubscribes = [];
-        // No logueado — mostrar login
-        splash.style.display = 'none';
-        loginScreen.style.display = 'flex';
+        aplicarVisibilidadAdmin(false);
+
+        splash.style.display            = 'none';
+        loginScreen.style.display       = 'flex';
         loginScreen.style.flexDirection = 'column';
-        appMain.style.display = 'none';
-        document.getElementById('login-btn').textContent = 'ENTRAR';
-        document.getElementById('login-btn').disabled = false;
+        appMain.style.display           = 'none';
+
+        const loginBtn = document.getElementById('login-btn');
+        if (loginBtn) { loginBtn.textContent = 'ENTRAR'; loginBtn.disabled = false; }
     }
 });
 
