@@ -3028,6 +3028,15 @@ function init() {
     const vidIC = document.getElementById('vid-install-cost'); if(vidIC) vidIC.value = vc.vidInstallCosto ?? 200;
     const pedCC = document.getElementById('ped-costo-corte'); if(pedCC) pedCC.value = vc.pedCostoCorte ?? 10;
     updateVentasMargenPill();
+    // Mostrar tab Admin si corresponde (se llama también desde onAuthStateChanged)
+    setTimeout(() => {
+        const adminBtn = document.getElementById('nav-btn-admin');
+        if (adminBtn && _fbIsAdmin) {
+            adminBtn.style.display = 'flex';
+            adminBtn.style.flexDirection = 'column';
+            adminBtn.style.alignItems = 'center';
+        }
+    }, 200);
 }
 function save() {
     // Guardar local siempre (respaldo offline)
@@ -6451,11 +6460,15 @@ _auth.onAuthStateChanged(async (user) => {
             renderAllScreens();
             renderKitsScreen();
         }
-        // Mostrar tab Admin solo al admin
+        // Mostrar tab Admin solo al admin — delay mayor para que init() termine
         setTimeout(() => {
             const adminBtn = document.getElementById('nav-btn-admin');
-            if (adminBtn) adminBtn.style.display = _fbIsAdmin ? 'flex' : 'none';
-        }, 300);
+            if (adminBtn) {
+                adminBtn.style.display = _fbIsAdmin ? 'flex' : 'none';
+                adminBtn.style.flexDirection = 'column';
+                adminBtn.style.alignItems = 'center';
+            }
+        }, 800);
         // Agregar botón de cerrar sesión en Config si no existe
         setTimeout(() => {
             if (!document.getElementById('btn-signout')) {
