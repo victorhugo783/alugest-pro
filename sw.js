@@ -1,10 +1,10 @@
 // ══════════════════════════════════════════════
-//  AluGest Pro — Service Worker  v1.0
+//  AluGest Pro — Service Worker  v2.0
 //  Estrategia: Cache-first para assets, 
 //              Network-first para datos
 // ══════════════════════════════════════════════
 
-const CACHE_NAME = 'alugest-v1';
+const CACHE_NAME = 'alugest-v2';
 
 // Archivos que se cachean al instalar
 const PRECACHE = [
@@ -14,7 +14,7 @@ const PRECACHE = [
 
 // ── Instalación: precachear archivos base ──
 self.addEventListener('install', event => {
-    console.log('[SW] Instalando...');
+    console.log('[SW] Instalando v2...');
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => {
@@ -27,7 +27,7 @@ self.addEventListener('install', event => {
 
 // ── Activación: limpiar caches viejos ──
 self.addEventListener('activate', event => {
-    console.log('[SW] Activando...');
+    console.log('[SW] Activando v2...');
     event.waitUntil(
         caches.keys().then(keys =>
             Promise.all(
@@ -57,40 +57,26 @@ self.addEventListener('fetch', event => {
         return; // dejar pasar sin interceptar
     }
 
-    // Archivos de la app → Cache-first con fallback a red
+    // Archivos de la app → Network-first (siempre actualizado) con fallback a cache
     event.respondWith(
-        caches.match(event.request).then(cached => {
-            if (cached) {
-                // Actualizar cache en background (stale-while-revalidate)
-                fetch(event.request)
-                    .then(fresh => {
-                        if (fresh && fresh.status === 200) {
-                            caches.open(CACHE_NAME)
-                                .then(cache => cache.put(event.request, fresh));
-                        }
-                    })
-                    .catch(() => {}); // silencioso si no hay red
-                return cached;
-            }
-
-            // No está en cache → ir a la red y guardar
-            return fetch(event.request)
-                .then(response => {
-                    if (!response || response.status !== 200 || response.type === 'opaque') {
-                        return response;
-                    }
+        fetch(event.request)
+            .then(response => {
+                if (response && response.status === 200 && response.type !== 'opaque') {
                     const toCache = response.clone();
                     caches.open(CACHE_NAME)
                         .then(cache => cache.put(event.request, toCache));
-                    return response;
-                })
-                .catch(() => {
-                    // Sin red y sin cache → página offline básica
+                }
+                return response;
+            })
+            .catch(() => {
+                // Sin red → intentar cache
+                return caches.match(event.request).then(cached => {
+                    if (cached) return cached;
                     if (event.request.destination === 'document') {
                         return caches.match('./ListaMaterial.html');
                     }
                 });
-        })
+            })
     );
 });
 
