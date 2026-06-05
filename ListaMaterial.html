@@ -2502,7 +2502,7 @@
 <div id="screen-history" class="screen">
     <div class="container">
         <div class="screen-header">
-            <span class="screen-title">Pedidos</span>
+            <span class="screen-title">Lista de Material</span>
         </div>
         <div class="search-bar" style="margin-bottom:10px">
             <span class="search-icon">
@@ -2571,15 +2571,15 @@
 
         <!-- Sub-tabs -->
         <div class="sub-tab-bar">
-            <button class="sub-tab-btn active" id="stab-metro" onclick="switchVentasTab('metro')">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 3l12 18M18 3L6 21"/><circle cx="6" cy="3" r="1.8" fill="currentColor" stroke="none"/><circle cx="18" cy="3" r="1.8" fill="currentColor" stroke="none"/></svg>
-                Metro Lineal<span id="badge-metro" style="display:none;background:var(--accent);color:#fff;border-radius:9px;padding:1px 6px;font-size:8px;margin-left:3px"></span>
-                <span class="stab-sub">Perfiles de aluminio por metro</span>
-            </button>
-            <button class="sub-tab-btn" id="stab-vidrio" onclick="switchVentasTab('vidrio')">
+            <button class="sub-tab-btn active" id="stab-vidrio" onclick="switchVentasTab('vidrio')">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
                 Vidrio / Espejo<span id="badge-vidrio" style="display:none;background:var(--accent);color:#fff;border-radius:9px;padding:1px 6px;font-size:8px;margin-left:3px"></span>
                 <span class="stab-sub">Precio por m² a medida</span>
+            </button>
+            <button class="sub-tab-btn" id="stab-metro" onclick="switchVentasTab('metro')">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 3l12 18M18 3L6 21"/><circle cx="6" cy="3" r="1.8" fill="currentColor" stroke="none"/><circle cx="18" cy="3" r="1.8" fill="currentColor" stroke="none"/></svg>
+                Metro Lineal<span id="badge-metro" style="display:none;background:var(--accent);color:#fff;border-radius:9px;padding:1px 6px;font-size:8px;margin-left:3px"></span>
+                <span class="stab-sub">Perfiles de aluminio por metro</span>
             </button>
             <button class="sub-tab-btn" id="stab-vcotiz" onclick="switchVentasTab('cotiz')">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -2598,7 +2598,7 @@
         </div>
 
         <!-- ── SUB-PANEL: METRO LINEAL (solo perfiles) ── -->
-        <div class="sub-panel active" id="spanel-metro">
+        <div class="sub-panel" id="spanel-metro">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
                 <span style="font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:0.5px">SOLO PERFILES DE ALUMINIO</span>
                 <button onclick="pedLoadKitDropdown()" id="ped-kit-btn"
@@ -2641,7 +2641,7 @@
         </div>
 
         <!-- ── SUB-PANEL: VIDRIO / ESPEJO (por m²) ── -->
-        <div class="sub-panel" id="spanel-vidrio">
+        <div class="sub-panel active" id="spanel-vidrio">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
                 <span style="font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:0.5px">SOLO VIDRIOS Y ESPEJOS</span>
                 <!-- Toggle instalación rápido -->
@@ -2921,7 +2921,7 @@
     </button>
     <button data-tab="history" class="nav-btn" onclick="navigate('screen-history',this)">
         <span class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 3"/><path d="M3.05 11a9 9 0 1 1 .5 4"/><path d="M3 16V11H8"/></svg></span>
-        Pedidos
+        Lista Mat.
     </button>
     <button data-tab="ventas" class="nav-btn" onclick="navigate('screen-ventas',this)">
         <span class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
@@ -5832,7 +5832,7 @@ function editVentaCotiz(id) {
     // Switch to the appropriate tab
     if (_pedItems.length && !_vidItems.length) switchVentasTab('metro');
     else if (_vidItems.length && !_pedItems.length) switchVentasTab('vidrio');
-    else switchVentasTab('metro');
+    else switchVentasTab('vidrio');
     pedRenderAll();
     vidRenderAll();
     showToast('Editando COT #' + h.folio, 'info');
@@ -6357,7 +6357,95 @@ function escucharBroadcasts(user) {
 // ══════════════════════════════════════════════
 
 let _adminEventosCache = [];
+let _adminSesionesCache = [];
 let _adminEventosFiltro = 'todos';
+
+
+// ── B. Selector destino mensaje ──
+let _adminMsgTarget = 'todos';
+function adminMsgTarget(target) {
+    _adminMsgTarget = target;
+    document.getElementById('msgtarget-todos').classList.toggle('active', target === 'todos');
+    document.getElementById('msgtarget-usuario').classList.toggle('active', target === 'usuario');
+    const sel = document.getElementById('admin-msg-user-select');
+    if (sel) sel.style.display = target === 'usuario' ? '' : 'none';
+}
+
+// ── E. Cargar usuarios registrados con opción de eliminar ──
+async function adminCargarUsuariosRegistrados() {
+    if (!_fbIsAdmin) return;
+    const el = document.getElementById('admin-usuarios-registrados');
+    if (!el) return;
+    el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando...</div>`;
+    try {
+        const snap = await _db.collection('usuarios').get();
+        const usuarios = snap.docs
+            .map(d => ({ uid: d.id, ...d.data() }))
+            .filter(u => u.uid !== _currentUser?.uid); // excluir admin
+        if (!usuarios.length) {
+            el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Sin usuarios registrados</div>`;
+            return;
+        }
+        // Populate message select and events select with users
+        const msgSel = document.getElementById('admin-msg-user-select');
+        const efilSel = document.getElementById('efil-usuario');
+        if (msgSel) {
+            msgSel.innerHTML = '<option value="">Selecciona un usuario...</option>' +
+                usuarios.map(u => `<option value="${u.uid}">${u.displayName || u.email || u.uid}</option>`).join('');
+        }
+        if (efilSel) {
+            const prev = efilSel.value;
+            efilSel.innerHTML = '<option value="todos">👥 Todos los usuarios</option>' +
+                usuarios.map(u => `<option value="${u.uid}" ${u.uid===prev?'selected':''}>${u.displayName || u.email || u.uid}</option>`).join('');
+        }
+        el.innerHTML = usuarios.map(u => {
+            const nombre = u.displayName || u.email || u.uid;
+            const rol = u.role === 'admin' ? '👑 Admin' : '👤 Usuario';
+            const ultimaAct = u.updatedAt ? new Date(u.updatedAt.seconds * 1000).toLocaleDateString('es-MX') : '—';
+            return `<div class="card" style="margin-bottom:6px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:8px">
+                <div style="flex:1;min-width:0">
+                    <div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:2px">${nombre}</div>
+                    <div style="font-size:10px;font-family:var(--mono);color:var(--text3)">${rol} · Últ. actividad: ${ultimaAct}</div>
+                    <div style="font-size:10px;font-family:var(--mono);color:var(--text3);word-break:break-all">${u.email || ''}</div>
+                </div>
+                <button onclick="adminEliminarUsuario('${u.uid}','${nombre.replace(/'/g,"\'")}',this)"
+                    style="flex-shrink:0;background:none;border:1.5px solid var(--danger);border-radius:var(--radius-xs);padding:6px 10px;color:var(--danger);font-size:11px;font-family:var(--mono);cursor:pointer">
+                    🗑 Eliminar
+                </button>
+            </div>`;
+        }).join('');
+    } catch(e) {
+        el.innerHTML = `<div class="card" style="color:var(--danger);font-size:12px;padding:14px">Error: ${e.message}</div>`;
+    }
+}
+
+async function adminEliminarUsuario(uid, nombre, btn) {
+    if (!_fbIsAdmin) return;
+    if (!confirm(\`¿Eliminar a \${nombre}? Se borrarán todas sus sesiones y eventos registrados. Esta acción no se puede deshacer.\`)) return;
+    btn.textContent = '...';
+    btn.disabled = true;
+    try {
+        // Borrar documento de usuario
+        await _db.collection('usuarios').doc(uid).delete();
+        // Borrar sesiones
+        const sesSnap = await _db.collection('sesiones').where('uid','==',uid).get();
+        const batch1 = _db.batch();
+        sesSnap.docs.forEach(d => batch1.delete(d.ref));
+        if (!sesSnap.empty) await batch1.commit();
+        // Borrar eventos_global
+        const evSnap = await _db.collection('eventos_global').where('uid','==',uid).get();
+        const batch2 = _db.batch();
+        evSnap.docs.forEach(d => batch2.delete(d.ref));
+        if (!evSnap.empty) await batch2.commit();
+        showToast(\`\${nombre} eliminado correctamente\`, 'success');
+        adminCargarUsuariosRegistrados();
+        _adminEventosCache = []; // invalidar cache eventos
+    } catch(e) {
+        showToast('Error: ' + e.message, 'error');
+        btn.textContent = '🗑 Eliminar';
+        btn.disabled = false;
+    }
+}
 
 // ── Sub-tab navigation ──
 function adminTab(tab) {
@@ -6389,6 +6477,7 @@ async function adminCargarDashboard() {
         const sesionesSnap = await _db.collection('sesiones')
             .where('inicio', '>', hace30).get();
         const sesiones = sesionesSnap.docs.map(d => d.data()).filter(d => d.email !== ADMIN_EMAIL);
+        _adminSesionesCache = sesiones; // cache for events filter
         const usuariosUnicos = new Set(sesiones.map(s => s.uid)).size;
         const cotizaciones = eventos.filter(e => e.tipo === 'cotizacion').length;
         const busquedas    = eventos.filter(e => e.tipo === 'busqueda').length;
@@ -6578,6 +6667,20 @@ async function adminCargarEventos() {
                 .where('ts', '>', hace30).orderBy('ts','desc').limit(300).get();
             _adminEventosCache = snap.docs.map(d => d.data());
         }
+        if (!_adminSesionesCache.length) {
+            const hace30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
+            const sSnap = await _db.collection('sesiones').where('inicio','>',hace30).orderBy('inicio','desc').limit(200).get();
+            _adminSesionesCache = sSnap.docs.map(d => d.data()).filter(d => d.email !== ADMIN_EMAIL);
+        }
+        // Populate user filter dropdown
+        const efilSel = document.getElementById('efil-usuario');
+        if (efilSel && _adminEventosCache.length) {
+            const uids = {};
+            [..._adminEventosCache, ..._adminSesionesCache].forEach(e => { if(e.uid && e.nombre) uids[e.uid] = e.nombre || e.email; });
+            const prev = efilSel.value;
+            efilSel.innerHTML = '<option value="todos">👥 Todos los usuarios</option>' +
+                Object.entries(uids).map(([uid,nom]) => `<option value="${uid}" ${uid===prev?'selected':''} >${nom}</option>`).join('');
+        }
         adminRenderEventosFiltrados();
     } catch(e) {
         el.innerHTML = `<div class="card" style="color:var(--danger);font-size:12px;padding:14px">Error: ${e.message}</div>`;
@@ -6586,8 +6689,8 @@ async function adminCargarEventos() {
 
 function adminFiltrarEventos(tipo) {
     _adminEventosFiltro = tipo;
-    ['todos','cotizacion','busqueda','kit_cargado','producto_agregado'].forEach(t => {
-        const id = t === 'kit_cargado' ? 'efil-kit' : t === 'producto_agregado' ? 'efil-producto' : 'efil-' + t;
+    const btnMap = { 'todos':'efil-todos','cotizacion':'efil-cotizacion','busqueda':'efil-busqueda','kit_cargado':'efil-kit','producto_agregado':'efil-producto','sesion':'efil-sesion' };
+    Object.entries(btnMap).forEach(([t, id]) => {
         const btn = document.getElementById(id);
         if (btn) btn.classList.toggle('active', t === tipo);
     });
@@ -6597,27 +6700,54 @@ function adminFiltrarEventos(tipo) {
 function adminRenderEventosFiltrados() {
     const el = document.getElementById('admin-eventos-list');
     if (!el) return;
-    const labels = { 'busqueda':'🔍','kit_cargado':'📦','cotizacion':'💰','ventas':'🛒','pedidos':'📋','comparar':'⚖️','config':'⚙️','producto_agregado':'➕' };
-    const lista = _adminEventosFiltro === 'todos'
-        ? _adminEventosCache
-        : _adminEventosCache.filter(e => e.tipo === _adminEventosFiltro);
+    const labels = { 'busqueda':'🔍','kit_cargado':'📦','cotizacion':'💰','ventas':'🛒','pedidos':'📋','comparar':'⚖️','config':'⚙️','producto_agregado':'➕','sesion':'🔑' };
+    const labelsTxt = { 'busqueda':'Búsqueda','kit_cargado':'Kit cargado','cotizacion':'Cotización','ventas':'Ventas','pedidos':'Pedidos','comparar':'Comparar','config':'Config','producto_agregado':'Producto agregado','sesion':'Sesión' };
+    const uidFiltro = (document.getElementById('efil-usuario')?.value || 'todos');
+
+    // For sesion filter use sesionesCache, otherwise use eventosCache
+    let lista;
+    if (_adminEventosFiltro === 'sesion') {
+        lista = (_adminSesionesCache || []).map(s => ({
+            tipo: 'sesion',
+            ts: s.inicio,
+            nombre: s.nombre || s.email || '—',
+            uid: s.uid,
+            _sesion: s
+        }));
+    } else {
+        lista = _adminEventosFiltro === 'todos'
+            ? _adminEventosCache
+            : _adminEventosCache.filter(e => e.tipo === _adminEventosFiltro);
+    }
+
+    if (uidFiltro !== 'todos') lista = lista.filter(e => e.uid === uidFiltro);
     if (!lista.length) {
         el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Sin eventos de este tipo</div>`;
         return;
     }
-    el.innerHTML = lista.slice(0,80).map(e => {
+
+    el.innerHTML = lista.slice(0,100).map(e => {
         const hora = new Date(e.ts).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
         let detalle = '';
-        if (e.tipo === 'cotizacion') {
-            detalle = `<span style="color:var(--success)">$${(e.total||0).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0})}</span> · ${e.cliente||'—'} · ${e.items||0} items`;
+        let extra = '';
+        if (e.tipo === 'sesion') {
+            const s = e._sesion;
+            const ds = s.duracionSegundos;
+            const dur = ds ? (ds < 60 ? `${ds}s` : ds < 3600 ? `${Math.round(ds/60)}min` : `${Math.floor(ds/3600)}h ${Math.round((ds%3600)/60)}min`) : (s.activo ? '🟢 En línea' : '—');
+            const inicio = new Date(s.inicio).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+            const funciones = [...new Set((s.eventos||[]).map(ev => ev.tipo))].join(', ') || '—';
+            detalle = `Inicio: ${inicio} · Duración: ${dur}`;
+            extra = funciones !== '—' ? `<div style="font-size:10px;color:var(--accent);font-family:var(--mono);margin-top:2px">Usó: ${funciones}</div>` : '';
+        } else if (e.tipo === 'cotizacion') {
+            detalle = `$${(e.total||0).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0})} · ${e.cliente||'—'} · ${e.items||0} productos`;
         } else if (e.tipo === 'busqueda') {
             detalle = `"${e.detalle||''}"`;
         } else if (e.tipo === 'kit_cargado') {
-            detalle = e.detalle || '';
+            detalle = `Kit: ${e.detalle||'—'}`;
         } else if (e.tipo === 'producto_agregado') {
-            detalle = `${e.nombre||''} ${e.color||''} <span style="color:var(--text3)">(${e.lista||''})</span>`;
+            detalle = `${e.nombre||''} ${e.color||''} (${e.lista||''})`;
         } else {
-            detalle = e.detalle || '';
+            detalle = e.detalle || labelsTxt[e.tipo] || e.tipo;
         }
         return `<div class="card" style="margin-bottom:6px;padding:10px 12px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
@@ -6625,6 +6755,7 @@ function adminRenderEventosFiltrados() {
                 <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${hora}</span>
             </div>
             <div style="font-size:11px;color:var(--text2);font-family:var(--mono)">${detalle}</div>
+            ${extra}
         </div>`;
     }).join('');
 }
@@ -7053,6 +7184,13 @@ init();
         <div id="admin-online-list" class="card" style="padding:10px;min-height:60px;margin-bottom:12px">
             <div style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:12px 0">Cargando...</div>
         </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div class="section-divider-label" style="margin:0">USUARIOS REGISTRADOS</div>
+            <button onclick="adminCargarUsuariosRegistrados()" style="background:none;border:none;font-size:10px;font-family:var(--mono);color:var(--accent);cursor:pointer;padding:4px">↺ Actualizar</button>
+        </div>
+        <div id="admin-usuarios-registrados" style="min-height:60px;margin-bottom:16px">
+            <div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando...</div>
+        </div>
         <div class="section-divider-label">SESIONES RECIENTES (30 días)</div>
         <div id="admin-activity-list" style="min-height:60px;margin-bottom:80px">
             <div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando...</div>
@@ -7061,12 +7199,16 @@ init();
 
     <!-- PANEL: EVENTOS -->
     <div id="apanel-eventos" class="container" style="padding-top:12px;display:none">
-        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+        <select id="efil-usuario" onchange="adminRenderEventosFiltrados()" style="margin-bottom:8px;font-size:13px;padding:8px 12px;width:100%;background:var(--surface2);border:1.5px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font)">
+            <option value="todos">👥 Todos los usuarios</option>
+        </select>
+        <div style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap">
             <button onclick="adminFiltrarEventos('todos')" id="efil-todos" class="sub-tab-btn active" style="font-size:10px">Todos</button>
-            <button onclick="adminFiltrarEventos('cotizacion')" id="efil-cotizacion" class="sub-tab-btn" style="font-size:10px">💰 Cotizaciones</button>
-            <button onclick="adminFiltrarEventos('busqueda')" id="efil-busqueda" class="sub-tab-btn" style="font-size:10px">🔍 Búsquedas</button>
+            <button onclick="adminFiltrarEventos('cotizacion')" id="efil-cotizacion" class="sub-tab-btn" style="font-size:10px">💰 Cotiz.</button>
+            <button onclick="adminFiltrarEventos('busqueda')" id="efil-busqueda" class="sub-tab-btn" style="font-size:10px">🔍 Búsq.</button>
             <button onclick="adminFiltrarEventos('kit_cargado')" id="efil-kit" class="sub-tab-btn" style="font-size:10px">📦 Kits</button>
-            <button onclick="adminFiltrarEventos('producto_agregado')" id="efil-producto" class="sub-tab-btn" style="font-size:10px">➕ Productos</button>
+            <button onclick="adminFiltrarEventos('producto_agregado')" id="efil-producto" class="sub-tab-btn" style="font-size:10px">➕ Prod.</button>
+            <button onclick="adminFiltrarEventos('sesion')" id="efil-sesion" class="sub-tab-btn" style="font-size:10px">🔑 Sesiones</button>
         </div>
         <div id="admin-eventos-list" style="min-height:60px;margin-bottom:80px">
             <div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando...</div>
@@ -7076,12 +7218,19 @@ init();
     <!-- PANEL: MENSAJES -->
     <div id="apanel-mensajes" class="container" style="padding-top:12px;display:none">
         <div class="card" style="margin-bottom:12px">
-            <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;margin-bottom:8px">📢 ENVIAR MENSAJE A TODOS</div>
+            <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;margin-bottom:8px">📢 ENVIAR MENSAJE</div>
+            <div style="display:flex;gap:6px;margin-bottom:8px">
+                <button onclick="adminMsgTarget('todos')" id="msgtarget-todos" class="sub-tab-btn active" style="font-size:10px;flex:1">A todos</button>
+                <button onclick="adminMsgTarget('usuario')" id="msgtarget-usuario" class="sub-tab-btn" style="font-size:10px;flex:1">Usuario específico</button>
+            </div>
+            <select id="admin-msg-user-select" style="display:none;margin-bottom:8px;font-size:13px;padding:8px 12px;width:100%;background:var(--surface2);border:1.5px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font)">
+                <option value="">Selecciona un usuario...</option>
+            </select>
             <input type="text" id="admin-msg-input" placeholder="Ej: Nuevo kit ventana corrediza disponible" autocomplete="off"
                 style="margin-bottom:8px;font-size:14px" maxlength="120"
                 onkeydown="if(event.key==='Enter')adminSendBroadcast()">
             <button onclick="adminSendBroadcast()" class="btn-main" style="margin:0;font-size:12px">
-                📤 ENVIAR NOTIFICACIÓN A TODOS
+                📤 ENVIAR NOTIFICACIÓN
             </button>
         </div>
         <div class="section-divider-label">NOTIFICACIONES</div>
