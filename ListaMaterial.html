@@ -2502,7 +2502,7 @@
 <div id="screen-history" class="screen">
     <div class="container">
         <div class="screen-header">
-            <span class="screen-title">Lista de Material</span>
+            <span class="screen-title">Pedidos</span>
         </div>
         <div class="search-bar" style="margin-bottom:10px">
             <span class="search-icon">
@@ -2571,15 +2571,15 @@
 
         <!-- Sub-tabs -->
         <div class="sub-tab-bar">
-            <button class="sub-tab-btn active" id="stab-vidrio" onclick="switchVentasTab('vidrio')">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
-                Vidrio / Espejo<span id="badge-vidrio" style="display:none;background:var(--accent);color:#fff;border-radius:9px;padding:1px 6px;font-size:8px;margin-left:3px"></span>
-                <span class="stab-sub">Precio por m² a medida</span>
-            </button>
-            <button class="sub-tab-btn" id="stab-metro" onclick="switchVentasTab('metro')">
+            <button class="sub-tab-btn active" id="stab-metro" onclick="switchVentasTab('metro')">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 3l12 18M18 3L6 21"/><circle cx="6" cy="3" r="1.8" fill="currentColor" stroke="none"/><circle cx="18" cy="3" r="1.8" fill="currentColor" stroke="none"/></svg>
                 Metro Lineal<span id="badge-metro" style="display:none;background:var(--accent);color:#fff;border-radius:9px;padding:1px 6px;font-size:8px;margin-left:3px"></span>
                 <span class="stab-sub">Perfiles de aluminio por metro</span>
+            </button>
+            <button class="sub-tab-btn" id="stab-vidrio" onclick="switchVentasTab('vidrio')">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
+                Vidrio / Espejo<span id="badge-vidrio" style="display:none;background:var(--accent);color:#fff;border-radius:9px;padding:1px 6px;font-size:8px;margin-left:3px"></span>
+                <span class="stab-sub">Precio por m² a medida</span>
             </button>
             <button class="sub-tab-btn" id="stab-vcotiz" onclick="switchVentasTab('cotiz')">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -2598,7 +2598,7 @@
         </div>
 
         <!-- ── SUB-PANEL: METRO LINEAL (solo perfiles) ── -->
-        <div class="sub-panel" id="spanel-metro">
+        <div class="sub-panel active" id="spanel-metro">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
                 <span style="font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:0.5px">SOLO PERFILES DE ALUMINIO</span>
                 <button onclick="pedLoadKitDropdown()" id="ped-kit-btn"
@@ -2641,7 +2641,7 @@
         </div>
 
         <!-- ── SUB-PANEL: VIDRIO / ESPEJO (por m²) ── -->
-        <div class="sub-panel active" id="spanel-vidrio">
+        <div class="sub-panel" id="spanel-vidrio">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
                 <span style="font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:0.5px">SOLO VIDRIOS Y ESPEJOS</span>
                 <!-- Toggle instalación rápido -->
@@ -2788,8 +2788,8 @@
                 <div id="error-cost" class="field-error-msg">⚠ El precio debe ser mayor a cero</div>
                 <button class="btn-main" id="btn-save-item" onclick="addItem()">GUARDAR EN CATÁLOGO</button>
             </div>
-            <div class="section-divider-label" id="admin-masiva-label">Actualización Masiva de Precios</div>
-            <div id="admin-masiva-card" class="card" style="padding:14px">
+            <div class="section-divider-label">Actualización Masiva de Precios</div>
+            <div class="card" style="padding:14px">
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
                     <input type="number" id="pct-input" placeholder="% (ej. 10 o -5)" step="0.1"
                         style="flex:1;margin:0;font-family:var(--mono);font-size:15px;text-align:center">
@@ -2801,9 +2801,9 @@
                 </label>
                 <button class="btn-main ghost-btn" id="btn-deshacer" onclick="deshacerPrecios()" style="display:none;margin:0;border-color:var(--accent);color:var(--accent)">↩ DESHACER ÚLTIMO CAMBIO</button>
             </div>
-            <div class="section-divider-label" id="admin-backup-label">Respaldo de datos</div>
-            <button id="admin-export-btn" class="btn-main ghost-btn" onclick="exportData()">↑ EXPORTAR RESPALDO</button>
-            <button id="admin-import-btn" class="btn-main ghost-btn" style="margin-top:6px" onclick="importData()">↓ IMPORTAR RESPALDO</button>
+            <div class="section-divider-label">Respaldo de datos</div>
+            <button class="btn-main ghost-btn" onclick="exportData()">↑ EXPORTAR RESPALDO</button>
+            <button class="btn-main ghost-btn" style="margin-top:6px" onclick="importData()">↓ IMPORTAR RESPALDO</button>
             <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(this)">
         </div>
     </div>
@@ -2921,7 +2921,7 @@
     </button>
     <button data-tab="history" class="nav-btn" onclick="navigate('screen-history',this)">
         <span class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 3"/><path d="M3.05 11a9 9 0 1 1 .5 4"/><path d="M3 16V11H8"/></svg></span>
-        Lista Mat.
+        Pedidos
     </button>
     <button data-tab="ventas" class="nav-btn" onclick="navigate('screen-ventas',this)">
         <span class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
@@ -3080,7 +3080,7 @@ function navigate(id, btn) {
     if (id === 'screen-budget') { populateKitSelector(true); if(!_currentInvoiceId) _currentInvoiceId = null; renderFloatingBar(); }
     else { /* bar is inline, nothing to hide */ }
     if (id === 'screen-history') checkBackupAlert();
-    if (id === 'screen-config') { checkDeshacerBtn(); renderKitsScreen(); if(_fbIsAdmin) renderPriceEditor(); aplicarPermisosUsuario(_fbIsAdmin); }
+    if (id === 'screen-config') { checkDeshacerBtn(); renderKitsScreen(); renderPriceEditor(); }
     if (id === 'screen-comparar') { populateCmpSelectors(); }
     if (id === 'screen-ventas') { pedRenderAll(); vidRenderAll(); if (document.getElementById('spanel-cotiz')?.classList.contains('active')) renderVentaHistory(); }
     if (id === 'screen-admin') { adminTab('dashboard'); }
@@ -3896,10 +3896,10 @@ function renderHistory() {
 // ── Distribuidores y precios ──
 function buildDistTabs() { const bar = document.getElementById('dist-tabs-bar'); bar.innerHTML = ['TODOS', ...data.distributors].map(t => `<button class="dist-tab ${t===_activeDist?'active':''}" onclick="setDistTab('${t}')">${t}</button>`).join(''); }
 function setDistTab(dist) { _activeDist = dist; buildDistTabs(); renderPriceEditor(); }
-function debouncedRenderPriceEditor() { if(window._priceSearchTimer) clearTimeout(window._priceSearchTimer); window._priceSearchTimer = setTimeout(() => { renderPriceEditor(); if(!_fbIsAdmin) document.querySelectorAll('.dist-price-row input').forEach(el => el.disabled = true); }, 200); }
+function debouncedRenderPriceEditor() { if(window._priceSearchTimer) clearTimeout(window._priceSearchTimer); window._priceSearchTimer = setTimeout(renderPriceEditor,200); }
 function debouncedHandleSearch(val) { if(window._searchTimer) clearTimeout(window._searchTimer); window._searchTimer = setTimeout(() => handleSearch(val),200); }
 let _priceSaveTimer = null;
-function debouncedSavePrice(id, dist, val) { if(!_fbIsAdmin){showToast('Sin permisos','info');return;} const p = data.prods.find(x => x.id == id); if(!p) return; const num = parseFloat(val); if(isNaN(num) || num <= 0) return; if(!p.prices) p.prices = {}; p.prices[dist] = { val: num, date: Date.now() }; if(_priceSaveTimer) clearTimeout(_priceSaveTimer); _priceSaveTimer = setTimeout(() => save(),600); }
+function debouncedSavePrice(id, dist, val) { const p = data.prods.find(x => x.id == id); if(!p) return; const num = parseFloat(val); if(isNaN(num) || num <= 0) return; if(!p.prices) p.prices = {}; p.prices[dist] = { val: num, date: Date.now() }; if(_priceSaveTimer) clearTimeout(_priceSaveTimer); _priceSaveTimer = setTimeout(() => save(),600); }
 function maskMoneyDisplay(val) { if(!val && val!==0) return ''; return '$ ' + Number(val).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function priceMaskFocus(i) { const raw = i.dataset.raw||''; i.value = raw && raw!=='0' ? raw : ''; i.classList.add('price-masked'); }
 function priceMaskBlur(i, pid, dist) { let raw = (i.dataset.raw||i.value).replace(/[^0-9.]/g,''); let num = parseFloat(raw)||0; i.dataset.raw = num; i.value = num>0 ? maskMoneyDisplay(num) : ''; if(num<=0) i.style.borderColor='rgba(255,83,112,0.5)'; else { i.style.borderColor=''; debouncedSavePrice(pid,dist,num); } }
@@ -4017,7 +4017,6 @@ function updateThemeBtn(theme) {
 
 function checkDeshacerBtn() { document.getElementById('btn-deshacer').style.display = localStorage.getItem('respaldo_materiales') ? 'block' : 'none'; }
 function addItem() {
-    if (!_fbIsAdmin) { showToast('Sin permisos', 'info'); return; }
     const nameInp = document.getElementById('new-name'), costInp = document.getElementById('new-item-cost');
     const nameWrap = nameInp.closest('.ghost-wrap'), errorName = document.getElementById('error-name'), errorCost = document.getElementById('error-cost');
     const n = toUpper(nameInp.value), cost = parseFloat(costInp.value);
@@ -4057,8 +4056,8 @@ function ghostUpdate(inputId, ghostId, sourceFn) { const input = document.getEle
 function getAcNames(q) { const qN = normalizeText(q); const m = data.prods.find(p=> normalizeText(p.name).startsWith(qN)); return m ? m.name : ''; }
 function getAcColors(q) { const qN = normalizeText(q); const m = data.prods.find(p=> p.color && normalizeText(p.color).startsWith(qN)); return m ? m.color : ''; }
 function toggleMeasureGroupInput() { const cat = document.getElementById('new-category').value; const cont = document.getElementById('new-measure-group-container'); cont.style.display = (cat === 'vidrio') ? 'block' : 'none'; if(cat !== 'vidrio') document.getElementById('new-measure-group').value = ''; }
-function exportData() { if(!_fbIsAdmin){showToast('Sin permisos','info');return;} data.lastBackupCount = data.history.length; save(); const blob = new Blob([JSON.stringify(data)], {type:'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'AluGest_Backup.json'; a.click(); showToast('✓ RESPALDO EXPORTADO'); checkBackupAlert(); }
-function importData() { if(!_fbIsAdmin){showToast('Sin permisos','info');return;} document.getElementById('import-file').click(); }
+function exportData() { data.lastBackupCount = data.history.length; save(); const blob = new Blob([JSON.stringify(data)], {type:'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'AluGest_Backup.json'; a.click(); showToast('✓ RESPALDO EXPORTADO'); checkBackupAlert(); }
+function importData() { document.getElementById('import-file').click(); }
 function handleImport(inp) { const file = inp.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = e => { try { const imp = JSON.parse(e.target.result); if(imp.prods) { data = {...data, ...imp}; if(!data.kits) data.kits=[]; if(!data.ventaHistory) data.ventaHistory=[]; if(!data.cartSections) data.cartSections=[]; save(); renderAllScreens(); buildDistTabs(); renderKitsScreen(); showToast('✓ IMPORTADO'); } } catch(e) { showToast('ERROR AL IMPORTAR','info'); } }; reader.readAsText(file); inp.value = ''; }
 function renderAll() { const active = document.querySelector('.screen.active')?.id; if(active === 'screen-budget') { renderSelectedList(); populateKitSelector(true); } if(active === 'screen-history') { const container = document.getElementById('history-list'); if(container) container.innerHTML = ''; renderHistory(); } if(active === 'screen-config') { renderPriceEditor(); } }
 function renderAllScreens() { renderSelectedList(); renderHistory(); renderPriceEditor(); populateKitSelector(); }
@@ -5832,7 +5831,7 @@ function editVentaCotiz(id) {
     // Switch to the appropriate tab
     if (_pedItems.length && !_vidItems.length) switchVentasTab('metro');
     else if (_vidItems.length && !_pedItems.length) switchVentasTab('vidrio');
-    else switchVentasTab('vidrio');
+    else switchVentasTab('metro');
     pedRenderAll();
     vidRenderAll();
     showToast('Editando COT #' + h.folio, 'info');
@@ -6162,48 +6161,6 @@ async function verificarRolAdmin(uid) {
 // ─────────────────────────────────────────────
 //  2. VISIBILIDAD DEL PANEL ADMIN
 // ─────────────────────────────────────────────
-function aplicarPermisosUsuario(esAdmin) {
-    // Elementos exclusivos del admin — invisibles para usuarios comunes
-    const soloAdmin = [
-        'ctab-catalogo',       // Sub-tab Catálogo en Config
-        'ctab-kits',           // Sub-tab Kits en Config
-        'cpanel-catalogo',     // Panel catálogo (edición de precios)
-        'cpanel-kits',         // Panel kits (crear/editar kits)
-        'admin-masiva-label',  // Sección actualización masiva
-        'admin-masiva-card',   // Card actualización masiva
-        'admin-backup-label',  // Sección respaldo
-        'admin-export-btn',    // Botón exportar
-        'admin-import-btn',    // Botón importar
-        'import-file',         // Input file importar
-        'btn-save-item',       // Botón guardar en catálogo
-        'error-name',          // Mensajes de error del form de catálogo
-        'error-cost',
-    ];
-    soloAdmin.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = esAdmin ? '' : 'none';
-    });
-
-    // Si no es admin y Config está activo en sub-tab catálogo o kits → redirigir a ajustes
-    if (!esAdmin) {
-        const catActive = document.getElementById('ctab-catalogo')?.classList.contains('active');
-        const kitsActive = document.getElementById('ctab-kits')?.classList.contains('active');
-        if (catActive || kitsActive) {
-            switchConfigTab('ajustes');
-        }
-        // Ocultar inputs de precio en catálogo (por si acaso se renderizan)
-        document.querySelectorAll('.dist-price-row input').forEach(el => el.disabled = true);
-    } else {
-        document.querySelectorAll('.dist-price-row input').forEach(el => el.disabled = false);
-    }
-
-    // El tab Config sigue visible para todos, pero para no-admins arranca en Ajustes
-    if (!esAdmin) {
-        const ctabAjustes = document.getElementById('ctab-ajustes');
-        if (ctabAjustes) ctabAjustes.click();
-    }
-}
-
 function aplicarVisibilidadAdmin(esAdmin) {
     const navBtn = document.getElementById('nav-btn-admin');
     const screen = document.getElementById('screen-admin');
@@ -6360,93 +6317,6 @@ let _adminEventosCache = [];
 let _adminSesionesCache = [];
 let _adminEventosFiltro = 'todos';
 
-
-// ── B. Selector destino mensaje ──
-let _adminMsgTarget = 'todos';
-function adminMsgTarget(target) {
-    _adminMsgTarget = target;
-    document.getElementById('msgtarget-todos').classList.toggle('active', target === 'todos');
-    document.getElementById('msgtarget-usuario').classList.toggle('active', target === 'usuario');
-    const sel = document.getElementById('admin-msg-user-select');
-    if (sel) sel.style.display = target === 'usuario' ? '' : 'none';
-}
-
-// ── E. Cargar usuarios registrados con opción de eliminar ──
-async function adminCargarUsuariosRegistrados() {
-    if (!_fbIsAdmin) return;
-    const el = document.getElementById('admin-usuarios-registrados');
-    if (!el) return;
-    el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando...</div>`;
-    try {
-        const snap = await _db.collection('usuarios').get();
-        const usuarios = snap.docs
-            .map(d => ({ uid: d.id, ...d.data() }))
-            .filter(u => u.uid !== _currentUser?.uid); // excluir admin
-        if (!usuarios.length) {
-            el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Sin usuarios registrados</div>`;
-            return;
-        }
-        // Populate message select and events select with users
-        const msgSel = document.getElementById('admin-msg-user-select');
-        const efilSel = document.getElementById('efil-usuario');
-        if (msgSel) {
-            msgSel.innerHTML = '<option value="">Selecciona un usuario...</option>' +
-                usuarios.map(u => `<option value="${u.uid}">${u.displayName || u.email || u.uid}</option>`).join('');
-        }
-        if (efilSel) {
-            const prev = efilSel.value;
-            efilSel.innerHTML = '<option value="todos">👥 Todos los usuarios</option>' +
-                usuarios.map(u => `<option value="${u.uid}" ${u.uid===prev?'selected':''}>${u.displayName || u.email || u.uid}</option>`).join('');
-        }
-        el.innerHTML = usuarios.map(u => {
-            const nombre = u.displayName || u.email || u.uid;
-            const rol = u.role === 'admin' ? '👑 Admin' : '👤 Usuario';
-            const ultimaAct = u.updatedAt ? new Date(u.updatedAt.seconds * 1000).toLocaleDateString('es-MX') : '—';
-            return `<div class="card" style="margin-bottom:6px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:8px">
-                <div style="flex:1;min-width:0">
-                    <div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:2px">${nombre}</div>
-                    <div style="font-size:10px;font-family:var(--mono);color:var(--text3)">${rol} · Últ. actividad: ${ultimaAct}</div>
-                    <div style="font-size:10px;font-family:var(--mono);color:var(--text3);word-break:break-all">${u.email || ''}</div>
-                </div>
-                <button onclick="adminEliminarUsuario('${u.uid}','${nombre.replace(/'/g,"\'")}',this)"
-                    style="flex-shrink:0;background:none;border:1.5px solid var(--danger);border-radius:var(--radius-xs);padding:6px 10px;color:var(--danger);font-size:11px;font-family:var(--mono);cursor:pointer">
-                    🗑 Eliminar
-                </button>
-            </div>`;
-        }).join('');
-    } catch(e) {
-        el.innerHTML = `<div class="card" style="color:var(--danger);font-size:12px;padding:14px">Error: ${e.message}</div>`;
-    }
-}
-
-async function adminEliminarUsuario(uid, nombre, btn) {
-    if (!_fbIsAdmin) return;
-    if (!confirm(\`¿Eliminar a \${nombre}? Se borrarán todas sus sesiones y eventos registrados. Esta acción no se puede deshacer.\`)) return;
-    btn.textContent = '...';
-    btn.disabled = true;
-    try {
-        // Borrar documento de usuario
-        await _db.collection('usuarios').doc(uid).delete();
-        // Borrar sesiones
-        const sesSnap = await _db.collection('sesiones').where('uid','==',uid).get();
-        const batch1 = _db.batch();
-        sesSnap.docs.forEach(d => batch1.delete(d.ref));
-        if (!sesSnap.empty) await batch1.commit();
-        // Borrar eventos_global
-        const evSnap = await _db.collection('eventos_global').where('uid','==',uid).get();
-        const batch2 = _db.batch();
-        evSnap.docs.forEach(d => batch2.delete(d.ref));
-        if (!evSnap.empty) await batch2.commit();
-        showToast(\`\${nombre} eliminado correctamente\`, 'success');
-        adminCargarUsuariosRegistrados();
-        _adminEventosCache = []; // invalidar cache eventos
-    } catch(e) {
-        showToast('Error: ' + e.message, 'error');
-        btn.textContent = '🗑 Eliminar';
-        btn.disabled = false;
-    }
-}
-
 // ── Sub-tab navigation ──
 function adminTab(tab) {
     ['dashboard','usuarios','eventos','mensajes'].forEach(t => {
@@ -6456,7 +6326,7 @@ function adminTab(tab) {
         if (btn)   btn.classList.toggle('active', t === tab);
     });
     if (tab === 'dashboard') adminCargarDashboard();
-    if (tab === 'usuarios')  { adminCargarOnline(); adminCargarActividad(); }
+    if (tab === 'usuarios')  { adminCargarOnline(); adminCargarActividad(); adminCargarUsuariosRegistrados(); }
     if (tab === 'eventos')   adminCargarEventos();
 }
 
@@ -6477,7 +6347,7 @@ async function adminCargarDashboard() {
         const sesionesSnap = await _db.collection('sesiones')
             .where('inicio', '>', hace30).get();
         const sesiones = sesionesSnap.docs.map(d => d.data()).filter(d => d.email !== ADMIN_EMAIL);
-        _adminSesionesCache = sesiones; // cache for events filter
+        _adminSesionesCache = sesiones;
         const usuariosUnicos = new Set(sesiones.map(s => s.uid)).size;
         const cotizaciones = eventos.filter(e => e.tipo === 'cotizacion').length;
         const busquedas    = eventos.filter(e => e.tipo === 'busqueda').length;
@@ -6487,8 +6357,8 @@ async function adminCargarDashboard() {
         document.getElementById('kpi-busquedas').textContent     = busquedas;
         document.getElementById('kpi-usuarios').textContent      = usuariosUnicos;
 
-        // Gráfica circular por función
-        adminRenderPieChart(eventos);
+        // Gráfica actividad por día (14 días)
+        adminRenderChartDias(sesiones);
 
         // Funciones más usadas
         adminRenderStatsChart(eventos);
@@ -6507,93 +6377,34 @@ async function adminCargarDashboard() {
     }
 }
 
-// ── Gráfica circular por función ──
-function adminRenderChartDias(sesiones, eventos) {
-    // Se llama con eventos desde adminCargarDashboard
-    // sesiones se ignora — usamos eventos para el pastel
-}
-
-function adminRenderPieChart(eventos) {
-    const canvas  = document.getElementById('admin-pie-canvas');
-    const legendEl = document.getElementById('admin-pie-legend');
-    const emptyEl  = document.getElementById('admin-pie-empty');
-    if (!canvas) return;
-
-    const labels = {
-        'busqueda':         { label: 'Búsqueda',         color: '#3b82f6' },
-        'kit_cargado':      { label: 'Kit cargado',       color: '#8b5cf6' },
-        'cotizacion':       { label: 'Cotización',        color: '#10b981' },
-        'producto_agregado':{ label: 'Producto agregado', color: '#f59e0b' },
-        'ventas':           { label: 'Ventas',            color: '#06b6d4' },
-        'pedidos':          { label: 'Pedidos',           color: '#f97316' },
-        'comparar':         { label: 'Comparar',          color: '#ec4899' },
-        'config':           { label: 'Config',            color: '#6b7280' },
-    };
-
-    const cnt = {};
-    eventos.forEach(e => { cnt[e.tipo] = (cnt[e.tipo]||0) + 1; });
-    const total = Object.values(cnt).reduce((a,b)=>a+b, 0);
-
-    if (!total) {
-        canvas.style.display = 'none';
-        legendEl.style.display = 'none';
-        if (emptyEl) emptyEl.style.display = 'block';
-        return;
+// ── Gráfica de barras por día ──
+function adminRenderChartDias(sesiones) {
+    const chartEl  = document.getElementById('admin-chart-dias');
+    const labelEl  = document.getElementById('admin-chart-labels');
+    if (!chartEl) return;
+    const dias = {};
+    for (let i = 13; i >= 0; i--) {
+        const d = new Date(Date.now() - i * 86400000);
+        const key = d.toISOString().substring(0,10);
+        dias[key] = 0;
     }
-    canvas.style.display = '';
-    legendEl.style.display = '';
-    if (emptyEl) emptyEl.style.display = 'none';
-
-    const ctx = canvas.getContext('2d');
-    const cx = 65, cy = 65, r = 58, ri = 30;
-    ctx.clearRect(0, 0, 130, 130);
-
-    const sorted = Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
-    let startAngle = -Math.PI / 2;
-    const slices = sorted.map(([tipo, v]) => {
-        const color = labels[tipo]?.color || '#94a3b8';
-        const angle = (v / total) * 2 * Math.PI;
-        const slice = { tipo, v, color, startAngle, angle };
-        startAngle += angle;
-        return slice;
+    sesiones.forEach(s => {
+        const key = new Date(s.inicio).toISOString().substring(0,10);
+        if (key in dias) dias[key]++;
     });
-
-    // Draw donut slices
-    slices.forEach(s => {
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.arc(cx, cy, r, s.startAngle, s.startAngle + s.angle);
-        ctx.closePath();
-        ctx.fillStyle = s.color;
-        ctx.fill();
-    });
-    // Draw center hole
-    ctx.beginPath();
-    ctx.arc(cx, cy, ri, 0, 2 * Math.PI);
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--panel').trim() || '#1a2236';
-    ctx.fill();
-    // Center text
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#f0f4ff';
-    ctx.font = 'bold 18px DM Sans, system-ui';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(total, cx, cy - 8);
-    ctx.font = '10px DM Sans, system-ui';
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text3').trim() || '#6a80a8';
-    ctx.fillText('eventos', cx, cy + 10);
-
-    // Legend
-    legendEl.innerHTML = slices.map(s => {
-        const pct = Math.round(s.v / total * 100);
-        const lbl = labels[s.tipo]?.label || s.tipo;
-        return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:7px">
-            <div style="width:10px;height:10px;border-radius:50%;background:${s.color};flex-shrink:0"></div>
-            <div style="flex:1;min-width:0">
-                <div style="font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lbl}</div>
-                <div style="font-size:10px;font-family:var(--mono);color:var(--text3)">${s.v}x · ${pct}%</div>
-            </div>
+    const vals = Object.values(dias);
+    const max  = Math.max(...vals, 1);
+    const keys = Object.keys(dias);
+    chartEl.innerHTML = vals.map((v, i) => {
+        const pct = Math.round(v / max * 100);
+        const isToday = i === 13;
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:default" title="${keys[i]}: ${v} sesión(es)">
+            <div style="font-size:9px;font-family:var(--mono);color:var(--text3)">${v||''}</div>
+            <div style="width:100%;background:${isToday?'var(--accent)':'var(--accent-dim)'};border-radius:3px 3px 0 0;min-height:4px;height:${Math.max(pct,4)}px;transition:height 0.3s"></div>
         </div>`;
     }).join('');
+    const showKeys = keys.map((k,i) => i % 2 === 0 ? k.substring(5) : '');
+    labelEl.innerHTML = showKeys.map(k => `<span>${k}</span>`).join('');
 }
 
 // ── Funciones más usadas ──
@@ -6668,18 +6479,20 @@ async function adminCargarEventos() {
             _adminEventosCache = snap.docs.map(d => d.data());
         }
         if (!_adminSesionesCache.length) {
-            const hace30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
-            const sSnap = await _db.collection('sesiones').where('inicio','>',hace30).orderBy('inicio','desc').limit(200).get();
+            const hace30b = Date.now() - 30 * 24 * 60 * 60 * 1000;
+            const sSnap = await _db.collection('sesiones').where('inicio','>',hace30b).orderBy('inicio','desc').limit(200).get();
             _adminSesionesCache = sSnap.docs.map(d => d.data()).filter(d => d.email !== ADMIN_EMAIL);
         }
-        // Populate user filter dropdown
         const efilSel = document.getElementById('efil-usuario');
-        if (efilSel && _adminEventosCache.length) {
+        if (efilSel) {
             const uids = {};
-            [..._adminEventosCache, ..._adminSesionesCache].forEach(e => { if(e.uid && e.nombre) uids[e.uid] = e.nombre || e.email; });
+            [..._adminEventosCache, ..._adminSesionesCache].forEach(function(e) { if(e.uid && (e.nombre||e.email)) uids[e.uid] = e.nombre || e.email; });
             const prev = efilSel.value;
-            efilSel.innerHTML = '<option value="todos">👥 Todos los usuarios</option>' +
-                Object.entries(uids).map(([uid,nom]) => `<option value="${uid}" ${uid===prev?'selected':''} >${nom}</option>`).join('');
+            var optsHtml = '<option value="todos">Todos los usuarios</option>';
+            Object.keys(uids).forEach(function(uid) {
+                optsHtml += '<option value="' + uid + '"' + (uid===prev?' selected':'') + '>' + uids[uid] + '</option>';
+            });
+            efilSel.innerHTML = optsHtml;
         }
         adminRenderEventosFiltrados();
     } catch(e) {
@@ -6689,9 +6502,9 @@ async function adminCargarEventos() {
 
 function adminFiltrarEventos(tipo) {
     _adminEventosFiltro = tipo;
-    const btnMap = { 'todos':'efil-todos','cotizacion':'efil-cotizacion','busqueda':'efil-busqueda','kit_cargado':'efil-kit','producto_agregado':'efil-producto','sesion':'efil-sesion' };
-    Object.entries(btnMap).forEach(([t, id]) => {
-        const btn = document.getElementById(id);
+    var btnMap = {'todos':'efil-todos','cotizacion':'efil-cotizacion','busqueda':'efil-busqueda','kit_cargado':'efil-kit','producto_agregado':'efil-producto','sesion':'efil-sesion'};
+    Object.keys(btnMap).forEach(function(t) {
+        var btn = document.getElementById(btnMap[t]);
         if (btn) btn.classList.toggle('active', t === tipo);
     });
     adminRenderEventosFiltrados();
@@ -6700,67 +6513,114 @@ function adminFiltrarEventos(tipo) {
 function adminRenderEventosFiltrados() {
     const el = document.getElementById('admin-eventos-list');
     if (!el) return;
-    const labels = { 'busqueda':'🔍','kit_cargado':'📦','cotizacion':'💰','ventas':'🛒','pedidos':'📋','comparar':'⚖️','config':'⚙️','producto_agregado':'➕','sesion':'🔑' };
-    const labelsTxt = { 'busqueda':'Búsqueda','kit_cargado':'Kit cargado','cotizacion':'Cotización','ventas':'Ventas','pedidos':'Pedidos','comparar':'Comparar','config':'Config','producto_agregado':'Producto agregado','sesion':'Sesión' };
-    const uidFiltro = (document.getElementById('efil-usuario')?.value || 'todos');
+    const icons = { 'busqueda':'🔍','kit_cargado':'📦','cotizacion':'💰','ventas':'🛒','pedidos':'📋','comparar':'⚖️','config':'⚙️','producto_agregado':'➕','sesion':'🔑' };
+    const uidFiltro = (document.getElementById('efil-usuario') || {}).value || 'todos';
 
-    // For sesion filter use sesionesCache, otherwise use eventosCache
     let lista;
     if (_adminEventosFiltro === 'sesion') {
-        lista = (_adminSesionesCache || []).map(s => ({
-            tipo: 'sesion',
-            ts: s.inicio,
-            nombre: s.nombre || s.email || '—',
-            uid: s.uid,
-            _sesion: s
-        }));
+        lista = _adminSesionesCache.map(function(s) {
+            return { tipo:'sesion', ts: s.inicio, nombre: s.nombre||s.email||'—', uid: s.uid, _s: s };
+        });
     } else {
-        lista = _adminEventosFiltro === 'todos'
-            ? _adminEventosCache
-            : _adminEventosCache.filter(e => e.tipo === _adminEventosFiltro);
+        lista = _adminEventosFiltro === 'todos' ? _adminEventosCache : _adminEventosCache.filter(function(e){ return e.tipo === _adminEventosFiltro; });
     }
+    if (uidFiltro !== 'todos') lista = lista.filter(function(e){ return e.uid === uidFiltro; });
 
-    if (uidFiltro !== 'todos') lista = lista.filter(e => e.uid === uidFiltro);
     if (!lista.length) {
-        el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Sin eventos de este tipo</div>`;
+        el.innerHTML = '<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Sin eventos de este tipo</div>';
         return;
     }
-
-    el.innerHTML = lista.slice(0,100).map(e => {
+    el.innerHTML = lista.slice(0,100).map(function(e) {
         const hora = new Date(e.ts).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
         let detalle = '';
         let extra = '';
         if (e.tipo === 'sesion') {
-            const s = e._sesion;
+            const s = e._s;
             const ds = s.duracionSegundos;
-            const dur = ds ? (ds < 60 ? `${ds}s` : ds < 3600 ? `${Math.round(ds/60)}min` : `${Math.floor(ds/3600)}h ${Math.round((ds%3600)/60)}min`) : (s.activo ? '🟢 En línea' : '—');
-            const inicio = new Date(s.inicio).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-            const funciones = [...new Set((s.eventos||[]).map(ev => ev.tipo))].join(', ') || '—';
-            detalle = `Inicio: ${inicio} · Duración: ${dur}`;
-            extra = funciones !== '—' ? `<div style="font-size:10px;color:var(--accent);font-family:var(--mono);margin-top:2px">Usó: ${funciones}</div>` : '';
+            const dur = !ds ? (s.activo ? 'En linea' : '—') : ds < 60 ? ds+'s' : ds < 3600 ? Math.round(ds/60)+'min' : Math.floor(ds/3600)+'h '+Math.round((ds%3600)/60)+'min';
+            const funcs = [...new Set((s.eventos||[]).map(function(ev){ return ev.tipo; }))].join(', ') || '—';
+            detalle = 'Duracion: ' + dur;
+            if (funcs !== '—') extra = '<div style="font-size:10px;color:var(--accent);font-family:var(--mono);margin-top:2px">Uso: ' + funcs + '</div>';
         } else if (e.tipo === 'cotizacion') {
-            detalle = `$${(e.total||0).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0})} · ${e.cliente||'—'} · ${e.items||0} productos`;
+            detalle = '$' + (e.total||0).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0}) + ' - ' + (e.cliente||'—') + ' - ' + (e.items||0) + ' productos';
         } else if (e.tipo === 'busqueda') {
-            detalle = `"${e.detalle||''}"`;
+            detalle = '"' + (e.detalle||'') + '"';
         } else if (e.tipo === 'kit_cargado') {
-            detalle = `Kit: ${e.detalle||'—'}`;
+            detalle = 'Kit: ' + (e.detalle||'—');
         } else if (e.tipo === 'producto_agregado') {
-            detalle = `${e.nombre||''} ${e.color||''} (${e.lista||''})`;
+            detalle = (e.nombre||'') + ' ' + (e.color||'') + ' (' + (e.lista||'') + ')';
         } else {
-            detalle = e.detalle || labelsTxt[e.tipo] || e.tipo;
+            detalle = e.detalle || '';
         }
-        return `<div class="card" style="margin-bottom:6px;padding:10px 12px">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-                <span style="font-size:13px">${labels[e.tipo]||'•'} <strong style="color:var(--text)">${e.nombre||e.email||'—'}</strong></span>
-                <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${hora}</span>
-            </div>
-            <div style="font-size:11px;color:var(--text2);font-family:var(--mono)">${detalle}</div>
-            ${extra}
-        </div>`;
+        return '<div class="card" style="margin-bottom:6px;padding:10px 12px">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">' +
+            '<span style="font-size:13px">' + (icons[e.tipo]||'•') + ' <strong style="color:var(--text)">' + (e.nombre||e.email||'—') + '</strong></span>' +
+            '<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">' + hora + '</span>' +
+            '</div>' +
+            '<div style="font-size:11px;color:var(--text2);font-family:var(--mono)">' + detalle + '</div>' +
+            extra + '</div>';
     }).join('');
 }
 
 // ── Limpieza automática datos >30 días ──
+async function adminCargarUsuariosRegistrados() {
+    if (!_fbIsAdmin) return;
+    const el = document.getElementById('admin-usuarios-registrados');
+    if (!el) return;
+    el.innerHTML = '<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando...</div>';
+    try {
+        const snap = await _db.collection('usuarios').get();
+        const usuarios = snap.docs.map(d => Object.assign({ uid: d.id }, d.data())).filter(u => u.uid !== (_currentUser && _currentUser.uid));
+        if (!usuarios.length) {
+            el.innerHTML = '<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Sin usuarios registrados</div>';
+            return;
+        }
+        const msgSel = document.getElementById('admin-msg-user-select');
+        if (msgSel) {
+            msgSel.innerHTML = '<option value="">Selecciona un usuario...</option>' +
+                usuarios.map(u => '<option value="' + u.uid + '">' + (u.displayName || u.email || u.uid) + '</option>').join('');
+        }
+        el.innerHTML = usuarios.map(function(u) {
+            const nombre = u.displayName || u.email || u.uid;
+            const rol = u.role === 'admin' ? 'Admin' : 'Usuario';
+            const ult = u.updatedAt ? new Date(u.updatedAt.seconds * 1000).toLocaleDateString('es-MX') : '—';
+            return '<div class="card" style="margin-bottom:6px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:8px">' +
+                '<div style="flex:1;min-width:0">' +
+                '<div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:2px">' + nombre + '</div>' +
+                '<div style="font-size:10px;font-family:var(--mono);color:var(--text3)">' + rol + ' · Ult. actividad: ' + ult + '</div>' +
+                '<div style="font-size:10px;font-family:var(--mono);color:var(--text3);word-break:break-all">' + (u.email||'') + '</div>' +
+                '</div>' +
+                '<button onclick="adminEliminarUsuario(\'' + u.uid + '\',\'' + nombre.replace(/'/g,"\\'") + '\',this)" ' +
+                'style="flex-shrink:0;background:none;border:1.5px solid var(--danger);border-radius:var(--radius-xs);padding:6px 10px;color:var(--danger);font-size:11px;font-family:var(--mono);cursor:pointer">' +
+                'Eliminar</button></div>';
+        }).join('');
+    } catch(e) {
+        el.innerHTML = '<div class="card" style="color:var(--danger);font-size:12px;padding:14px">Error: ' + e.message + '</div>';
+    }
+}
+
+async function adminEliminarUsuario(uid, nombre, btn) {
+    if (!_fbIsAdmin) return;
+    if (!confirm('Eliminar a ' + nombre + '? Se borraran todas sus sesiones y eventos. Esta accion no se puede deshacer.')) return;
+    btn.textContent = '...';
+    btn.disabled = true;
+    try {
+        await _db.collection('usuarios').doc(uid).delete();
+        const sesSnap = await _db.collection('sesiones').where('uid','==',uid).get();
+        if (!sesSnap.empty) { const b = _db.batch(); sesSnap.docs.forEach(d => b.delete(d.ref)); await b.commit(); }
+        const evSnap = await _db.collection('eventos_global').where('uid','==',uid).get();
+        if (!evSnap.empty) { const b2 = _db.batch(); evSnap.docs.forEach(d => b2.delete(d.ref)); await b2.commit(); }
+        _adminEventosCache = [];
+        _adminSesionesCache = [];
+        showToast(nombre + ' eliminado correctamente', 'success');
+        adminCargarUsuariosRegistrados();
+    } catch(e) {
+        showToast('Error: ' + e.message, 'error');
+        btn.textContent = 'Eliminar';
+        btn.disabled = false;
+    }
+}
+
 async function adminLimpiarDatosAntiguos() {
     if (!_fbIsAdmin) return;
     const hace30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
@@ -7029,7 +6889,6 @@ _auth.onAuthStateChanged(async (user) => {
 
         // ② Aplicar visibilidad del panel según el rol confirmado
         aplicarVisibilidadAdmin(_fbIsAdmin);
-        aplicarPermisosUsuario(_fbIsAdmin);
 
         // ③ Cargar datos de Firestore
         await fbLoadCatalogo();
@@ -7088,7 +6947,6 @@ _auth.onAuthStateChanged(async (user) => {
         _adminUnsubscribes.forEach(u => u());
         _adminUnsubscribes = [];
         aplicarVisibilidadAdmin(false);
-        aplicarPermisosUsuario(false);
 
         splash.style.display            = 'none';
         loginScreen.style.display       = 'flex';
@@ -7157,13 +7015,10 @@ init();
             <div class="card" style="padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--info)" id="kpi-usuarios">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">USUARIOS ÚNICOS</div></div>
         </div>
         <!-- Actividad por día -->
-        <div class="section-divider-label">ACTIVIDAD POR FUNCIÓN (30d)</div>
-        <div class="card" style="padding:16px;margin-bottom:12px">
-            <div style="display:flex;align-items:center;gap:16px">
-                <canvas id="admin-pie-canvas" width="130" height="130" style="flex-shrink:0"></canvas>
-                <div id="admin-pie-legend" style="flex:1;min-width:0"></div>
-            </div>
-            <div id="admin-pie-empty" style="display:none;text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:16px 0">Sin datos aún</div>
+        <div class="section-divider-label">ACTIVIDAD ÚLTIMOS 14 DÍAS</div>
+        <div class="card" style="padding:14px;margin-bottom:12px">
+            <div id="admin-chart-dias" style="min-height:80px;display:flex;align-items:flex-end;gap:3px;justify-content:space-between"></div>
+            <div id="admin-chart-labels" style="display:flex;justify-content:space-between;margin-top:4px;font-size:9px;font-family:var(--mono);color:var(--text3)"></div>
         </div>
         <!-- Top eventos -->
         <div class="section-divider-label">FUNCIONES MÁS USADAS (30d)</div>
@@ -7186,9 +7041,9 @@ init();
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
             <div class="section-divider-label" style="margin:0">USUARIOS REGISTRADOS</div>
-            <button onclick="adminCargarUsuariosRegistrados()" style="background:none;border:none;font-size:10px;font-family:var(--mono);color:var(--accent);cursor:pointer;padding:4px">↺ Actualizar</button>
+            <button onclick="adminCargarUsuariosRegistrados()" style="background:none;border:none;font-size:10px;font-family:var(--mono);color:var(--accent);cursor:pointer;padding:4px">Actualizar</button>
         </div>
-        <div id="admin-usuarios-registrados" style="min-height:60px;margin-bottom:16px">
+        <div id="admin-usuarios-registrados" style="min-height:60px;margin-bottom:12px">
             <div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando...</div>
         </div>
         <div class="section-divider-label">SESIONES RECIENTES (30 días)</div>
@@ -7199,16 +7054,12 @@ init();
 
     <!-- PANEL: EVENTOS -->
     <div id="apanel-eventos" class="container" style="padding-top:12px;display:none">
-        <select id="efil-usuario" onchange="adminRenderEventosFiltrados()" style="margin-bottom:8px;font-size:13px;padding:8px 12px;width:100%;background:var(--surface2);border:1.5px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font)">
-            <option value="todos">👥 Todos los usuarios</option>
-        </select>
-        <div style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap">
+        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
             <button onclick="adminFiltrarEventos('todos')" id="efil-todos" class="sub-tab-btn active" style="font-size:10px">Todos</button>
-            <button onclick="adminFiltrarEventos('cotizacion')" id="efil-cotizacion" class="sub-tab-btn" style="font-size:10px">💰 Cotiz.</button>
-            <button onclick="adminFiltrarEventos('busqueda')" id="efil-busqueda" class="sub-tab-btn" style="font-size:10px">🔍 Búsq.</button>
+            <button onclick="adminFiltrarEventos('cotizacion')" id="efil-cotizacion" class="sub-tab-btn" style="font-size:10px">💰 Cotizaciones</button>
+            <button onclick="adminFiltrarEventos('busqueda')" id="efil-busqueda" class="sub-tab-btn" style="font-size:10px">🔍 Búsquedas</button>
             <button onclick="adminFiltrarEventos('kit_cargado')" id="efil-kit" class="sub-tab-btn" style="font-size:10px">📦 Kits</button>
-            <button onclick="adminFiltrarEventos('producto_agregado')" id="efil-producto" class="sub-tab-btn" style="font-size:10px">➕ Prod.</button>
-            <button onclick="adminFiltrarEventos('sesion')" id="efil-sesion" class="sub-tab-btn" style="font-size:10px">🔑 Sesiones</button>
+            <button onclick="adminFiltrarEventos('producto_agregado')" id="efil-producto" class="sub-tab-btn" style="font-size:10px">➕ Productos</button>
         </div>
         <div id="admin-eventos-list" style="min-height:60px;margin-bottom:80px">
             <div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando...</div>
@@ -7218,19 +7069,12 @@ init();
     <!-- PANEL: MENSAJES -->
     <div id="apanel-mensajes" class="container" style="padding-top:12px;display:none">
         <div class="card" style="margin-bottom:12px">
-            <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;margin-bottom:8px">📢 ENVIAR MENSAJE</div>
-            <div style="display:flex;gap:6px;margin-bottom:8px">
-                <button onclick="adminMsgTarget('todos')" id="msgtarget-todos" class="sub-tab-btn active" style="font-size:10px;flex:1">A todos</button>
-                <button onclick="adminMsgTarget('usuario')" id="msgtarget-usuario" class="sub-tab-btn" style="font-size:10px;flex:1">Usuario específico</button>
-            </div>
-            <select id="admin-msg-user-select" style="display:none;margin-bottom:8px;font-size:13px;padding:8px 12px;width:100%;background:var(--surface2);border:1.5px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font)">
-                <option value="">Selecciona un usuario...</option>
-            </select>
+            <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;margin-bottom:8px">📢 ENVIAR MENSAJE A TODOS</div>
             <input type="text" id="admin-msg-input" placeholder="Ej: Nuevo kit ventana corrediza disponible" autocomplete="off"
                 style="margin-bottom:8px;font-size:14px" maxlength="120"
                 onkeydown="if(event.key==='Enter')adminSendBroadcast()">
             <button onclick="adminSendBroadcast()" class="btn-main" style="margin:0;font-size:12px">
-                📤 ENVIAR NOTIFICACIÓN
+                📤 ENVIAR NOTIFICACIÓN A TODOS
             </button>
         </div>
         <div class="section-divider-label">NOTIFICACIONES</div>
