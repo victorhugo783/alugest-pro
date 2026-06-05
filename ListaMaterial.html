@@ -6398,8 +6398,8 @@ async function adminCargarDashboard() {
         document.getElementById('kpi-busquedas').textContent     = busquedas;
         document.getElementById('kpi-usuarios').textContent      = usuariosUnicos;
 
-        // Gráfica actividad por día (14 días)
-        adminRenderChartDias(sesiones);
+        // Gráfica circular por función
+        adminRenderPieChart(eventos);
 
         // Funciones más usadas
         adminRenderStatsChart(eventos);
@@ -6418,34 +6418,93 @@ async function adminCargarDashboard() {
     }
 }
 
-// ── Gráfica de barras por día ──
-function adminRenderChartDias(sesiones) {
-    const chartEl  = document.getElementById('admin-chart-dias');
-    const labelEl  = document.getElementById('admin-chart-labels');
-    if (!chartEl) return;
-    const dias = {};
-    for (let i = 13; i >= 0; i--) {
-        const d = new Date(Date.now() - i * 86400000);
-        const key = d.toISOString().substring(0,10);
-        dias[key] = 0;
+// ── Gráfica circular por función ──
+function adminRenderChartDias(sesiones, eventos) {
+    // Se llama con eventos desde adminCargarDashboard
+    // sesiones se ignora — usamos eventos para el pastel
+}
+
+function adminRenderPieChart(eventos) {
+    const canvas  = document.getElementById('admin-pie-canvas');
+    const legendEl = document.getElementById('admin-pie-legend');
+    const emptyEl  = document.getElementById('admin-pie-empty');
+    if (!canvas) return;
+
+    const labels = {
+        'busqueda':         { label: 'Búsqueda',         color: '#3b82f6' },
+        'kit_cargado':      { label: 'Kit cargado',       color: '#8b5cf6' },
+        'cotizacion':       { label: 'Cotización',        color: '#10b981' },
+        'producto_agregado':{ label: 'Producto agregado', color: '#f59e0b' },
+        'ventas':           { label: 'Ventas',            color: '#06b6d4' },
+        'pedidos':          { label: 'Pedidos',           color: '#f97316' },
+        'comparar':         { label: 'Comparar',          color: '#ec4899' },
+        'config':           { label: 'Config',            color: '#6b7280' },
+    };
+
+    const cnt = {};
+    eventos.forEach(e => { cnt[e.tipo] = (cnt[e.tipo]||0) + 1; });
+    const total = Object.values(cnt).reduce((a,b)=>a+b, 0);
+
+    if (!total) {
+        canvas.style.display = 'none';
+        legendEl.style.display = 'none';
+        if (emptyEl) emptyEl.style.display = 'block';
+        return;
     }
-    sesiones.forEach(s => {
-        const key = new Date(s.inicio).toISOString().substring(0,10);
-        if (key in dias) dias[key]++;
+    canvas.style.display = '';
+    legendEl.style.display = '';
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    const ctx = canvas.getContext('2d');
+    const cx = 65, cy = 65, r = 58, ri = 30;
+    ctx.clearRect(0, 0, 130, 130);
+
+    const sorted = Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
+    let startAngle = -Math.PI / 2;
+    const slices = sorted.map(([tipo, v]) => {
+        const color = labels[tipo]?.color || '#94a3b8';
+        const angle = (v / total) * 2 * Math.PI;
+        const slice = { tipo, v, color, startAngle, angle };
+        startAngle += angle;
+        return slice;
     });
-    const vals = Object.values(dias);
-    const max  = Math.max(...vals, 1);
-    const keys = Object.keys(dias);
-    chartEl.innerHTML = vals.map((v, i) => {
-        const pct = Math.round(v / max * 100);
-        const isToday = i === 13;
-        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:default" title="${keys[i]}: ${v} sesión(es)">
-            <div style="font-size:9px;font-family:var(--mono);color:var(--text3)">${v||''}</div>
-            <div style="width:100%;background:${isToday?'var(--accent)':'var(--accent-dim)'};border-radius:3px 3px 0 0;min-height:4px;height:${Math.max(pct,4)}px;transition:height 0.3s"></div>
+
+    // Draw donut slices
+    slices.forEach(s => {
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, r, s.startAngle, s.startAngle + s.angle);
+        ctx.closePath();
+        ctx.fillStyle = s.color;
+        ctx.fill();
+    });
+    // Draw center hole
+    ctx.beginPath();
+    ctx.arc(cx, cy, ri, 0, 2 * Math.PI);
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--panel').trim() || '#1a2236';
+    ctx.fill();
+    // Center text
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#f0f4ff';
+    ctx.font = 'bold 18px DM Sans, system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(total, cx, cy - 8);
+    ctx.font = '10px DM Sans, system-ui';
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text3').trim() || '#6a80a8';
+    ctx.fillText('eventos', cx, cy + 10);
+
+    // Legend
+    legendEl.innerHTML = slices.map(s => {
+        const pct = Math.round(s.v / total * 100);
+        const lbl = labels[s.tipo]?.label || s.tipo;
+        return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:7px">
+            <div style="width:10px;height:10px;border-radius:50%;background:${s.color};flex-shrink:0"></div>
+            <div style="flex:1;min-width:0">
+                <div style="font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lbl}</div>
+                <div style="font-size:10px;font-family:var(--mono);color:var(--text3)">${s.v}x · ${pct}%</div>
+            </div>
         </div>`;
     }).join('');
-    const showKeys = keys.map((k,i) => i % 2 === 0 ? k.substring(5) : '');
-    labelEl.innerHTML = showKeys.map(k => `<span>${k}</span>`).join('');
 }
 
 // ── Funciones más usadas ──
@@ -6967,10 +7026,13 @@ init();
             <div class="card" style="padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--info)" id="kpi-usuarios">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">USUARIOS ÚNICOS</div></div>
         </div>
         <!-- Actividad por día -->
-        <div class="section-divider-label">ACTIVIDAD ÚLTIMOS 14 DÍAS</div>
-        <div class="card" style="padding:14px;margin-bottom:12px">
-            <div id="admin-chart-dias" style="min-height:80px;display:flex;align-items:flex-end;gap:3px;justify-content:space-between"></div>
-            <div id="admin-chart-labels" style="display:flex;justify-content:space-between;margin-top:4px;font-size:9px;font-family:var(--mono);color:var(--text3)"></div>
+        <div class="section-divider-label">ACTIVIDAD POR FUNCIÓN (30d)</div>
+        <div class="card" style="padding:16px;margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:16px">
+                <canvas id="admin-pie-canvas" width="130" height="130" style="flex-shrink:0"></canvas>
+                <div id="admin-pie-legend" style="flex:1;min-width:0"></div>
+            </div>
+            <div id="admin-pie-empty" style="display:none;text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:16px 0">Sin datos aún</div>
         </div>
         <!-- Top eventos -->
         <div class="section-divider-label">FUNCIONES MÁS USADAS (30d)</div>
