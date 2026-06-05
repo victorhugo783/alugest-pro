@@ -426,14 +426,20 @@
             -webkit-backdrop-filter: var(--blur);
             backdrop-filter: var(--blur);
             display: flex;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
             border-top: 1px solid var(--border);
             z-index: 1000;
             left: 50%;
             transform: translateX(-50%);
             padding-bottom: env(safe-area-inset-bottom, 0);
         }
+        .nav-bar::-webkit-scrollbar { display: none; }
         .nav-btn {
             flex: 1;
+            min-width: 64px;
             padding: 12px 5px 10px;
             background: none;
             border: none;
