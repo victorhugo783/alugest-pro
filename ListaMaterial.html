@@ -2788,8 +2788,8 @@
                 <div id="error-cost" class="field-error-msg">⚠ El precio debe ser mayor a cero</div>
                 <button class="btn-main" id="btn-save-item" onclick="addItem()">GUARDAR EN CATÁLOGO</button>
             </div>
-            <div class="section-divider-label">Actualización Masiva de Precios</div>
-            <div class="card" style="padding:14px">
+            <div class="section-divider-label" id="admin-masiva-label">Actualización Masiva de Precios</div>
+            <div id="admin-masiva-card" class="card" style="padding:14px">
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
                     <input type="number" id="pct-input" placeholder="% (ej. 10 o -5)" step="0.1"
                         style="flex:1;margin:0;font-family:var(--mono);font-size:15px;text-align:center">
@@ -2801,9 +2801,9 @@
                 </label>
                 <button class="btn-main ghost-btn" id="btn-deshacer" onclick="deshacerPrecios()" style="display:none;margin:0;border-color:var(--accent);color:var(--accent)">↩ DESHACER ÚLTIMO CAMBIO</button>
             </div>
-            <div class="section-divider-label">Respaldo de datos</div>
-            <button class="btn-main ghost-btn" onclick="exportData()">↑ EXPORTAR RESPALDO</button>
-            <button class="btn-main ghost-btn" style="margin-top:6px" onclick="importData()">↓ IMPORTAR RESPALDO</button>
+            <div class="section-divider-label" id="admin-backup-label">Respaldo de datos</div>
+            <button id="admin-export-btn" class="btn-main ghost-btn" onclick="exportData()">↑ EXPORTAR RESPALDO</button>
+            <button id="admin-import-btn" class="btn-main ghost-btn" style="margin-top:6px" onclick="importData()">↓ IMPORTAR RESPALDO</button>
             <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(this)">
         </div>
     </div>
@@ -3080,7 +3080,7 @@ function navigate(id, btn) {
     if (id === 'screen-budget') { populateKitSelector(true); if(!_currentInvoiceId) _currentInvoiceId = null; renderFloatingBar(); }
     else { /* bar is inline, nothing to hide */ }
     if (id === 'screen-history') checkBackupAlert();
-    if (id === 'screen-config') { checkDeshacerBtn(); renderKitsScreen(); renderPriceEditor(); }
+    if (id === 'screen-config') { checkDeshacerBtn(); renderKitsScreen(); if(_fbIsAdmin) renderPriceEditor(); aplicarPermisosUsuario(_fbIsAdmin); }
     if (id === 'screen-comparar') { populateCmpSelectors(); }
     if (id === 'screen-ventas') { pedRenderAll(); vidRenderAll(); if (document.getElementById('spanel-cotiz')?.classList.contains('active')) renderVentaHistory(); }
     if (id === 'screen-admin') { adminTab('dashboard'); }
@@ -3896,10 +3896,10 @@ function renderHistory() {
 // ── Distribuidores y precios ──
 function buildDistTabs() { const bar = document.getElementById('dist-tabs-bar'); bar.innerHTML = ['TODOS', ...data.distributors].map(t => `<button class="dist-tab ${t===_activeDist?'active':''}" onclick="setDistTab('${t}')">${t}</button>`).join(''); }
 function setDistTab(dist) { _activeDist = dist; buildDistTabs(); renderPriceEditor(); }
-function debouncedRenderPriceEditor() { if(window._priceSearchTimer) clearTimeout(window._priceSearchTimer); window._priceSearchTimer = setTimeout(renderPriceEditor,200); }
+function debouncedRenderPriceEditor() { if(window._priceSearchTimer) clearTimeout(window._priceSearchTimer); window._priceSearchTimer = setTimeout(() => { renderPriceEditor(); if(!_fbIsAdmin) document.querySelectorAll('.dist-price-row input').forEach(el => el.disabled = true); }, 200); }
 function debouncedHandleSearch(val) { if(window._searchTimer) clearTimeout(window._searchTimer); window._searchTimer = setTimeout(() => handleSearch(val),200); }
 let _priceSaveTimer = null;
-function debouncedSavePrice(id, dist, val) { const p = data.prods.find(x => x.id == id); if(!p) return; const num = parseFloat(val); if(isNaN(num) || num <= 0) return; if(!p.prices) p.prices = {}; p.prices[dist] = { val: num, date: Date.now() }; if(_priceSaveTimer) clearTimeout(_priceSaveTimer); _priceSaveTimer = setTimeout(() => save(),600); }
+function debouncedSavePrice(id, dist, val) { if(!_fbIsAdmin){showToast('Sin permisos','info');return;} const p = data.prods.find(x => x.id == id); if(!p) return; const num = parseFloat(val); if(isNaN(num) || num <= 0) return; if(!p.prices) p.prices = {}; p.prices[dist] = { val: num, date: Date.now() }; if(_priceSaveTimer) clearTimeout(_priceSaveTimer); _priceSaveTimer = setTimeout(() => save(),600); }
 function maskMoneyDisplay(val) { if(!val && val!==0) return ''; return '$ ' + Number(val).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function priceMaskFocus(i) { const raw = i.dataset.raw||''; i.value = raw && raw!=='0' ? raw : ''; i.classList.add('price-masked'); }
 function priceMaskBlur(i, pid, dist) { let raw = (i.dataset.raw||i.value).replace(/[^0-9.]/g,''); let num = parseFloat(raw)||0; i.dataset.raw = num; i.value = num>0 ? maskMoneyDisplay(num) : ''; if(num<=0) i.style.borderColor='rgba(255,83,112,0.5)'; else { i.style.borderColor=''; debouncedSavePrice(pid,dist,num); } }
@@ -4017,6 +4017,7 @@ function updateThemeBtn(theme) {
 
 function checkDeshacerBtn() { document.getElementById('btn-deshacer').style.display = localStorage.getItem('respaldo_materiales') ? 'block' : 'none'; }
 function addItem() {
+    if (!_fbIsAdmin) { showToast('Sin permisos', 'info'); return; }
     const nameInp = document.getElementById('new-name'), costInp = document.getElementById('new-item-cost');
     const nameWrap = nameInp.closest('.ghost-wrap'), errorName = document.getElementById('error-name'), errorCost = document.getElementById('error-cost');
     const n = toUpper(nameInp.value), cost = parseFloat(costInp.value);
@@ -4056,8 +4057,8 @@ function ghostUpdate(inputId, ghostId, sourceFn) { const input = document.getEle
 function getAcNames(q) { const qN = normalizeText(q); const m = data.prods.find(p=> normalizeText(p.name).startsWith(qN)); return m ? m.name : ''; }
 function getAcColors(q) { const qN = normalizeText(q); const m = data.prods.find(p=> p.color && normalizeText(p.color).startsWith(qN)); return m ? m.color : ''; }
 function toggleMeasureGroupInput() { const cat = document.getElementById('new-category').value; const cont = document.getElementById('new-measure-group-container'); cont.style.display = (cat === 'vidrio') ? 'block' : 'none'; if(cat !== 'vidrio') document.getElementById('new-measure-group').value = ''; }
-function exportData() { data.lastBackupCount = data.history.length; save(); const blob = new Blob([JSON.stringify(data)], {type:'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'AluGest_Backup.json'; a.click(); showToast('✓ RESPALDO EXPORTADO'); checkBackupAlert(); }
-function importData() { document.getElementById('import-file').click(); }
+function exportData() { if(!_fbIsAdmin){showToast('Sin permisos','info');return;} data.lastBackupCount = data.history.length; save(); const blob = new Blob([JSON.stringify(data)], {type:'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'AluGest_Backup.json'; a.click(); showToast('✓ RESPALDO EXPORTADO'); checkBackupAlert(); }
+function importData() { if(!_fbIsAdmin){showToast('Sin permisos','info');return;} document.getElementById('import-file').click(); }
 function handleImport(inp) { const file = inp.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = e => { try { const imp = JSON.parse(e.target.result); if(imp.prods) { data = {...data, ...imp}; if(!data.kits) data.kits=[]; if(!data.ventaHistory) data.ventaHistory=[]; if(!data.cartSections) data.cartSections=[]; save(); renderAllScreens(); buildDistTabs(); renderKitsScreen(); showToast('✓ IMPORTADO'); } } catch(e) { showToast('ERROR AL IMPORTAR','info'); } }; reader.readAsText(file); inp.value = ''; }
 function renderAll() { const active = document.querySelector('.screen.active')?.id; if(active === 'screen-budget') { renderSelectedList(); populateKitSelector(true); } if(active === 'screen-history') { const container = document.getElementById('history-list'); if(container) container.innerHTML = ''; renderHistory(); } if(active === 'screen-config') { renderPriceEditor(); } }
 function renderAllScreens() { renderSelectedList(); renderHistory(); renderPriceEditor(); populateKitSelector(); }
@@ -6161,6 +6162,48 @@ async function verificarRolAdmin(uid) {
 // ─────────────────────────────────────────────
 //  2. VISIBILIDAD DEL PANEL ADMIN
 // ─────────────────────────────────────────────
+function aplicarPermisosUsuario(esAdmin) {
+    // Elementos exclusivos del admin — invisibles para usuarios comunes
+    const soloAdmin = [
+        'ctab-catalogo',       // Sub-tab Catálogo en Config
+        'ctab-kits',           // Sub-tab Kits en Config
+        'cpanel-catalogo',     // Panel catálogo (edición de precios)
+        'cpanel-kits',         // Panel kits (crear/editar kits)
+        'admin-masiva-label',  // Sección actualización masiva
+        'admin-masiva-card',   // Card actualización masiva
+        'admin-backup-label',  // Sección respaldo
+        'admin-export-btn',    // Botón exportar
+        'admin-import-btn',    // Botón importar
+        'import-file',         // Input file importar
+        'btn-save-item',       // Botón guardar en catálogo
+        'error-name',          // Mensajes de error del form de catálogo
+        'error-cost',
+    ];
+    soloAdmin.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = esAdmin ? '' : 'none';
+    });
+
+    // Si no es admin y Config está activo en sub-tab catálogo o kits → redirigir a ajustes
+    if (!esAdmin) {
+        const catActive = document.getElementById('ctab-catalogo')?.classList.contains('active');
+        const kitsActive = document.getElementById('ctab-kits')?.classList.contains('active');
+        if (catActive || kitsActive) {
+            switchConfigTab('ajustes');
+        }
+        // Ocultar inputs de precio en catálogo (por si acaso se renderizan)
+        document.querySelectorAll('.dist-price-row input').forEach(el => el.disabled = true);
+    } else {
+        document.querySelectorAll('.dist-price-row input').forEach(el => el.disabled = false);
+    }
+
+    // El tab Config sigue visible para todos, pero para no-admins arranca en Ajustes
+    if (!esAdmin) {
+        const ctabAjustes = document.getElementById('ctab-ajustes');
+        if (ctabAjustes) ctabAjustes.click();
+    }
+}
+
 function aplicarVisibilidadAdmin(esAdmin) {
     const navBtn = document.getElementById('nav-btn-admin');
     const screen = document.getElementById('screen-admin');
@@ -6796,6 +6839,7 @@ _auth.onAuthStateChanged(async (user) => {
 
         // ② Aplicar visibilidad del panel según el rol confirmado
         aplicarVisibilidadAdmin(_fbIsAdmin);
+        aplicarPermisosUsuario(_fbIsAdmin);
 
         // ③ Cargar datos de Firestore
         await fbLoadCatalogo();
@@ -6854,6 +6898,7 @@ _auth.onAuthStateChanged(async (user) => {
         _adminUnsubscribes.forEach(u => u());
         _adminUnsubscribes = [];
         aplicarVisibilidadAdmin(false);
+        aplicarPermisosUsuario(false);
 
         splash.style.display            = 'none';
         loginScreen.style.display       = 'flex';
