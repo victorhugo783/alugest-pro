@@ -2804,10 +2804,6 @@
             <button class="btn-main ghost-btn" onclick="exportData()">↑ EXPORTAR RESPALDO</button>
             <button class="btn-main ghost-btn" style="margin-top:6px" onclick="importData()">↓ IMPORTAR RESPALDO</button>
             <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(this)">
-
-            <div class="section-divider-label">Diagnóstico de sesión</div>
-            <button class="btn-main ghost-btn" style="margin-bottom:6px" onclick="diagnosticoAdmin()">🔍 VER MI ROL EN FIRESTORE</button>
-            <div id="diag-result" style="display:none;background:var(--surface2);border-radius:var(--radius-sm);padding:12px;font-family:var(--mono);font-size:12px;color:var(--text2);word-break:break-all;white-space:pre-wrap;margin-top:4px"></div>
         </div>
     </div>
 </div>
@@ -6288,27 +6284,6 @@ function escucharBroadcasts(user) {
             });
         }, () => {});
     _adminUnsubscribes.push(unsub);
-}
-
-async function diagnosticoAdmin() {
-    const el = document.getElementById("diag-result");
-    el.style.display = "block";
-    el.textContent = "Consultando Firestore...";
-    try {
-        const user = _auth.currentUser;
-        if (!user) { el.textContent = "❌ No hay sesión activa."; return; }
-        const snap = await _db.collection("usuarios").doc(user.uid).get();
-        const info = {
-            uid: user.uid,
-            email: user.email,
-            docExiste: snap.exists,
-            datosDoc: snap.exists ? snap.data() : null,
-            _fbIsAdmin: _fbIsAdmin
-        };
-        el.textContent = JSON.stringify(info, null, 2);
-    } catch (e) {
-        el.textContent = "❌ Error: " + e.message;
-    }
 }
 
 // ─────────────────────────────────────────────
