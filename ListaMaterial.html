@@ -426,34 +426,29 @@
             -webkit-backdrop-filter: var(--blur);
             backdrop-filter: var(--blur);
             display: flex;
-            overflow-x: auto;
-            overflow-y: hidden;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
             border-top: 1px solid var(--border);
             z-index: 1000;
             left: 50%;
             transform: translateX(-50%);
             padding-bottom: env(safe-area-inset-bottom, 0);
         }
-        .nav-bar::-webkit-scrollbar { display: none; }
         .nav-btn {
             flex: 1;
-            min-width: 64px;
-            padding: 12px 5px 10px;
+            min-width: 56px;
+            padding: 10px 2px 8px;
             background: none;
             border: none;
             color: var(--text3);
-            font-size: 12px;
+            font-size: 9px;
             cursor: pointer;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.3px;
             font-family: var(--font);
             font-weight: 600;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 5px;
+            gap: 4px;
             transition: color 0.22s;
             position: relative;
         }
@@ -3088,7 +3083,7 @@ function navigate(id, btn) {
     if (id === 'screen-config') { checkDeshacerBtn(); renderKitsScreen(); renderPriceEditor(); }
     if (id === 'screen-comparar') { populateCmpSelectors(); }
     if (id === 'screen-ventas') { pedRenderAll(); vidRenderAll(); if (document.getElementById('spanel-cotiz')?.classList.contains('active')) renderVentaHistory(); }
-    if (id === 'screen-admin') { adminCargarOnline(); adminCargarActividad(); }
+    if (id === 'screen-admin') { adminTab('dashboard'); }
     window.scrollTo({ top: 0, behavior: 'instant' });
     renderAll();
     // Tracking de navegación (usuarios, no admin)
@@ -5046,6 +5041,8 @@ function pedSearch(val) {
 }
 
 function pedAddItem(prodId) {
+    const _pProd = data.prods.find(x=>x.id==prodId);
+    if(_pProd) trackEvento('producto_agregado', { nombre: _pProd.name.substring(0,30), color: _pProd.color||'', categoria: _pProd.category, lista: 'perfiles' });
     _pedItems.push({ prodId, metros: '' });
     document.getElementById('ped-search').value = '';
     document.getElementById('ped-dropdown').style.display = 'none';
@@ -5266,6 +5263,8 @@ function vidParseHoja(p) {
 }
 
 function vidAddItem(prodId) {
+    const _vProd = data.prods.find(x=>x.id==prodId);
+    if(_vProd) trackEvento('producto_agregado', { nombre: _vProd.name.substring(0,30), color: _vProd.color||'', categoria: _vProd.category, lista: 'vidrios' });
     _vidItems.push({ prodId, anchoCorte: '', altoCorte: '' });
     document.getElementById('vid-search').value = '';
     document.getElementById('vid-dropdown').style.display = 'none';
@@ -5688,7 +5687,6 @@ function saveVentaCotizacion() {
     if (!includePerfiles && !includeVidrios) {
         showToast('Agrega medidas antes de guardar', 'info'); return;
     }
-    trackEvento('cotizacion', includePerfiles && includeVidrios ? 'perfiles+vidrio' : includePerfiles ? 'perfiles' : 'vidrio');
     let cliente = (document.getElementById('ventas-client')?.value || '').trim().toUpperCase();
     if (!cliente) {
         if (!confirm("Sin nombre de cliente. ¿Usar 'PÚBLICO EN GENERAL'?")) return;
@@ -5734,6 +5732,7 @@ function saveVentaCotizacion() {
     }
 
     const totalGeneral = totalPerfiles + totalVidrios;
+    trackEvento('cotizacion', { cliente: cliente||'PÚBLICO EN GENERAL', total: totalGeneral, tipo: includePerfiles && includeVidrios ? 'perfiles+vidrio' : includePerfiles ? 'perfiles' : 'vidrio', items: pedSnap.length + vidSnap.length });
     const folio = getVentaFolio();
     if (!data.ventaHistory) data.ventaHistory = [];
     data.ventaHistory.unshift({
@@ -6257,9 +6256,23 @@ async function cerrarSesion() {
 async function trackEvento(tipo, detalle) {
     if (!_sessionRef || !_currentUser || _fbIsAdmin) return;
     try {
+        const ev = { tipo, ts: Date.now() };
+        if (typeof detalle === 'object' && detalle !== null) {
+            Object.assign(ev, detalle);
+        } else if (detalle !== undefined) {
+            ev.detalle = detalle;
+        }
         await _sessionRef.update({
-            eventos: firebase.firestore.FieldValue.arrayUnion({ tipo, detalle, ts: Date.now() }),
+            eventos: firebase.firestore.FieldValue.arrayUnion(ev),
             ultimaActividad: Date.now()
+        });
+        // Also write to eventos_global for dashboard aggregation
+        await _db.collection('eventos_global').add({
+            ...ev,
+            uid: _currentUser.uid,
+            nombre: _currentUser.displayName || _currentUser.email,
+            email: _currentUser.email,
+            fecha: new Date().toISOString().substring(0,10)
         });
     } catch (e) {}
 }
@@ -6295,6 +6308,262 @@ function escucharBroadcasts(user) {
 // ─────────────────────────────────────────────
 //  6. FUNCIONES EXCLUSIVAS DE ADMIN
 // ─────────────────────────────────────────────
+
+// ══════════════════════════════════════════════
+//  ADMIN DASHBOARD v2
+// ══════════════════════════════════════════════
+
+let _adminEventosCache = [];
+let _adminEventosFiltro = 'todos';
+
+// ── Sub-tab navigation ──
+function adminTab(tab) {
+    ['dashboard','usuarios','eventos','mensajes'].forEach(t => {
+        const panel = document.getElementById('apanel-' + t);
+        const btn   = document.getElementById('atab-' + t);
+        if (panel) panel.style.display = t === tab ? '' : 'none';
+        if (btn)   btn.classList.toggle('active', t === tab);
+    });
+    if (tab === 'dashboard') adminCargarDashboard();
+    if (tab === 'usuarios')  { adminCargarOnline(); adminCargarActividad(); }
+    if (tab === 'eventos')   adminCargarEventos();
+}
+
+// ── Dashboard principal ──
+async function adminCargarDashboard() {
+    if (!_fbIsAdmin) return;
+    const hace30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    try {
+        // Cargar eventos_global de últimos 30 días
+        const snap = await _db.collection('eventos_global')
+            .where('ts', '>', hace30)
+            .orderBy('ts', 'desc')
+            .limit(500)
+            .get();
+        const eventos = snap.docs.map(d => d.data());
+
+        // KPIs
+        const sesionesSnap = await _db.collection('sesiones')
+            .where('inicio', '>', hace30).get();
+        const sesiones = sesionesSnap.docs.map(d => d.data()).filter(d => d.email !== ADMIN_EMAIL);
+        const usuariosUnicos = new Set(sesiones.map(s => s.uid)).size;
+        const cotizaciones = eventos.filter(e => e.tipo === 'cotizacion').length;
+        const busquedas    = eventos.filter(e => e.tipo === 'busqueda').length;
+
+        document.getElementById('kpi-sesiones').textContent     = sesiones.length;
+        document.getElementById('kpi-cotizaciones').textContent  = cotizaciones;
+        document.getElementById('kpi-busquedas').textContent     = busquedas;
+        document.getElementById('kpi-usuarios').textContent      = usuariosUnicos;
+
+        // Gráfica actividad por día (14 días)
+        adminRenderChartDias(sesiones);
+
+        // Funciones más usadas
+        adminRenderStatsChart(eventos);
+
+        // Top búsquedas
+        adminRenderTopBusquedas(eventos);
+
+        // Top productos
+        adminRenderTopProductos(eventos);
+
+        // Auto-limpieza datos >30 días
+        adminLimpiarDatosAntiguos();
+
+    } catch(e) {
+        console.warn('[Admin Dashboard]', e.message);
+    }
+}
+
+// ── Gráfica de barras por día ──
+function adminRenderChartDias(sesiones) {
+    const chartEl  = document.getElementById('admin-chart-dias');
+    const labelEl  = document.getElementById('admin-chart-labels');
+    if (!chartEl) return;
+    const dias = {};
+    for (let i = 13; i >= 0; i--) {
+        const d = new Date(Date.now() - i * 86400000);
+        const key = d.toISOString().substring(0,10);
+        dias[key] = 0;
+    }
+    sesiones.forEach(s => {
+        const key = new Date(s.inicio).toISOString().substring(0,10);
+        if (key in dias) dias[key]++;
+    });
+    const vals = Object.values(dias);
+    const max  = Math.max(...vals, 1);
+    const keys = Object.keys(dias);
+    chartEl.innerHTML = vals.map((v, i) => {
+        const pct = Math.round(v / max * 100);
+        const isToday = i === 13;
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:default" title="${keys[i]}: ${v} sesión(es)">
+            <div style="font-size:9px;font-family:var(--mono);color:var(--text3)">${v||''}</div>
+            <div style="width:100%;background:${isToday?'var(--accent)':'var(--accent-dim)'};border-radius:3px 3px 0 0;min-height:4px;height:${Math.max(pct,4)}px;transition:height 0.3s"></div>
+        </div>`;
+    }).join('');
+    const showKeys = keys.map((k,i) => i % 2 === 0 ? k.substring(5) : '');
+    labelEl.innerHTML = showKeys.map(k => `<span>${k}</span>`).join('');
+}
+
+// ── Funciones más usadas ──
+function adminRenderStatsChart(eventos) {
+    const el = document.getElementById('admin-stats-chart');
+    if (!el) return;
+    const labels = { 'busqueda':'🔍 Búsqueda','kit_cargado':'📦 Kit cargado','cotizacion':'💰 Cotización','ventas':'🛒 Ventas','pedidos':'📋 Pedidos','comparar':'⚖️ Comparar','config':'⚙️ Config','producto_agregado':'➕ Producto agregado' };
+    const cnt = {};
+    eventos.forEach(e => { cnt[e.tipo] = (cnt[e.tipo]||0) + 1; });
+    if (!Object.keys(cnt).length) { el.innerHTML = `<div style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:12px 0">Sin datos aún</div>`; return; }
+    const max = Math.max(...Object.values(cnt));
+    el.innerHTML = Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([k,v]) => `
+        <div style="margin-bottom:10px" onclick="adminTab('eventos');adminFiltrarEventos('${k}')">
+            <div style="display:flex;justify-content:space-between;font-size:11px;font-family:var(--mono);color:var(--text2);margin-bottom:3px;cursor:pointer">
+                <span>${labels[k]||k}</span><span style="color:var(--accent)">${v}x</span>
+            </div>
+            <div style="height:7px;background:var(--surface2);border-radius:4px;overflow:hidden">
+                <div style="height:100%;width:${Math.round(v/max*100)}%;background:var(--accent);border-radius:4px;transition:width 0.5s"></div>
+            </div>
+        </div>`).join('');
+}
+
+// ── Top búsquedas ──
+function adminRenderTopBusquedas(eventos) {
+    const el = document.getElementById('admin-top-busquedas');
+    if (!el) return;
+    const cnt = {};
+    eventos.filter(e => e.tipo === 'busqueda' && e.detalle).forEach(e => {
+        const k = (e.detalle||'').toLowerCase().trim();
+        if (k) cnt[k] = (cnt[k]||0) + 1;
+    });
+    const top = Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    if (!top.length) { el.innerHTML = `<div style="color:var(--text3);font-size:12px;font-family:var(--mono);text-align:center;padding:8px">Sin búsquedas registradas aún</div>`; return; }
+    el.innerHTML = top.map(([k,v]) =>
+        `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
+            <span style="color:var(--text2)">"${k}"</span>
+            <span style="font-family:var(--mono);color:var(--accent);font-size:11px">${v}x</span>
+        </div>`
+    ).join('');
+}
+
+// ── Top productos agregados ──
+function adminRenderTopProductos(eventos) {
+    const el = document.getElementById('admin-top-productos');
+    if (!el) return;
+    const cnt = {};
+    eventos.filter(e => e.tipo === 'producto_agregado' && e.nombre).forEach(e => {
+        const k = (e.nombre + (e.color?' '+e.color:'')).trim();
+        cnt[k] = (cnt[k]||0) + 1;
+    });
+    const top = Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    if (!top.length) { el.innerHTML = `<div style="color:var(--text3);font-size:12px;font-family:var(--mono);text-align:center;padding:8px">Sin productos registrados aún</div>`; return; }
+    el.innerHTML = top.map(([k,v]) =>
+        `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
+            <span style="color:var(--text2)">${k}</span>
+            <span style="font-family:var(--mono);color:var(--info);font-size:11px">${v}x</span>
+        </div>`
+    ).join('');
+}
+
+// ── Lista de eventos con filtro ──
+async function adminCargarEventos() {
+    if (!_fbIsAdmin) return;
+    const el = document.getElementById('admin-eventos-list');
+    if (!el) return;
+    el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando...</div>`;
+    try {
+        if (!_adminEventosCache.length) {
+            const hace30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
+            const snap = await _db.collection('eventos_global')
+                .where('ts', '>', hace30).orderBy('ts','desc').limit(300).get();
+            _adminEventosCache = snap.docs.map(d => d.data());
+        }
+        adminRenderEventosFiltrados();
+    } catch(e) {
+        el.innerHTML = `<div class="card" style="color:var(--danger);font-size:12px;padding:14px">Error: ${e.message}</div>`;
+    }
+}
+
+function adminFiltrarEventos(tipo) {
+    _adminEventosFiltro = tipo;
+    ['todos','cotizacion','busqueda','kit_cargado','producto_agregado'].forEach(t => {
+        const id = t === 'kit_cargado' ? 'efil-kit' : t === 'producto_agregado' ? 'efil-producto' : 'efil-' + t;
+        const btn = document.getElementById(id);
+        if (btn) btn.classList.toggle('active', t === tipo);
+    });
+    adminRenderEventosFiltrados();
+}
+
+function adminRenderEventosFiltrados() {
+    const el = document.getElementById('admin-eventos-list');
+    if (!el) return;
+    const labels = { 'busqueda':'🔍','kit_cargado':'📦','cotizacion':'💰','ventas':'🛒','pedidos':'📋','comparar':'⚖️','config':'⚙️','producto_agregado':'➕' };
+    const lista = _adminEventosFiltro === 'todos'
+        ? _adminEventosCache
+        : _adminEventosCache.filter(e => e.tipo === _adminEventosFiltro);
+    if (!lista.length) {
+        el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Sin eventos de este tipo</div>`;
+        return;
+    }
+    el.innerHTML = lista.slice(0,80).map(e => {
+        const hora = new Date(e.ts).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+        let detalle = '';
+        if (e.tipo === 'cotizacion') {
+            detalle = `<span style="color:var(--success)">$${(e.total||0).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0})}</span> · ${e.cliente||'—'} · ${e.items||0} items`;
+        } else if (e.tipo === 'busqueda') {
+            detalle = `"${e.detalle||''}"`;
+        } else if (e.tipo === 'kit_cargado') {
+            detalle = e.detalle || '';
+        } else if (e.tipo === 'producto_agregado') {
+            detalle = `${e.nombre||''} ${e.color||''} <span style="color:var(--text3)">(${e.lista||''})</span>`;
+        } else {
+            detalle = e.detalle || '';
+        }
+        return `<div class="card" style="margin-bottom:6px;padding:10px 12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+                <span style="font-size:13px">${labels[e.tipo]||'•'} <strong style="color:var(--text)">${e.nombre||e.email||'—'}</strong></span>
+                <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${hora}</span>
+            </div>
+            <div style="font-size:11px;color:var(--text2);font-family:var(--mono)">${detalle}</div>
+        </div>`;
+    }).join('');
+}
+
+// ── Limpieza automática datos >30 días ──
+async function adminLimpiarDatosAntiguos() {
+    if (!_fbIsAdmin) return;
+    const hace30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    try {
+        // Borrar sesiones antiguas
+        const snapSes = await _db.collection('sesiones').where('inicio','<',hace30).limit(50).get();
+        if (!snapSes.empty) {
+            const batch = _db.batch();
+            snapSes.docs.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+        }
+        // Borrar eventos_global antiguos
+        const snapEv = await _db.collection('eventos_global').where('ts','<',hace30).limit(100).get();
+        if (!snapEv.empty) {
+            const batch = _db.batch();
+            snapEv.docs.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+        }
+    } catch(e) { console.warn('[Limpieza]', e.message); }
+}
+
+async function adminLimpiarNotifs() {
+    if (!_fbIsAdmin) return;
+    try {
+        const snap = await _db.collection('notificaciones_admin').get();
+        const batch = _db.batch();
+        snap.docs.forEach(d => batch.update(d.ref, { leida: true }));
+        await batch.commit();
+        const badge = document.getElementById('admin-badge');
+        if (badge) badge.style.display = 'none';
+        showToast('Notificaciones limpiadas', 'success');
+    } catch(e) {
+        showToast('Error: ' + e.message, 'error');
+    }
+}
+
 async function adminSendBroadcast() {
     if (!_fbIsAdmin) return;
     const input = document.getElementById('admin-msg-input');
@@ -6369,15 +6638,38 @@ async function adminCargarActividad() {
         } else if (statsEl) {
             statsEl.innerHTML = `<div style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:12px 0">Sin datos de uso aún</div>`;
         }
-        el.innerHTML = sesiones.slice(0, 15).map(s => {
+        const labelEvento = { 'busqueda': '🔍 Búsqueda', 'kit_cargado': '📦 Kit cargado', 'cotizacion': '📄 Cotización', 'ventas': '🛒 Ventas', 'pedidos': '📋 Pedidos', 'comparar': '⚖️ Comparar', 'config': '⚙️ Config' };
+        el.innerHTML = sesiones.slice(0, 15).map((s, i) => {
             const ds = s.duracionSegundos;
-            const dur = ds ? (ds < 60 ? `${ds}s` : ds < 3600 ? `${Math.round(ds / 60)}min` : `${Math.floor(ds / 3600)}h ${Math.round((ds % 3600) / 60)}min`) : (s.activo ? 'En línea' : '—');
+            const dur = ds ? (ds < 60 ? `${ds}s` : ds < 3600 ? `${Math.round(ds / 60)}min` : `${Math.floor(ds / 3600)}h ${Math.round((ds % 3600) / 60)}min`) : (s.activo ? '🟢 En línea' : '—');
             const fecha = new Date(s.inicio).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
             const funcs = [...new Set((s.eventos || []).map(e => e.tipo))].join(', ') || '—';
-            return `<div class="card" style="margin-bottom:6px;padding:10px 12px">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px"><span style="font-weight:700;font-size:13px;color:var(--text)">${s.nombre}</span><span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${dur}</span></div>
-                <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:3px">${fecha}</div>
-                ${funcs !== '—' ? `<div style="font-size:10px;color:var(--accent);font-family:var(--mono)">Usó: ${funcs}</div>` : ''}
+            const eventos = (s.eventos || []);
+            const detalleHTML = eventos.length ? eventos.map(ev => {
+                const hora = new Date(ev.ts).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                return `<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px">
+                    <span style="color:var(--text3);font-family:var(--mono);min-width:60px">${hora}</span>
+                    <span style="color:var(--text2)">${labelEvento[ev.tipo] || ev.tipo}${ev.detalle && ev.detalle !== ev.tipo ? ` <span style="color:var(--text3)">(${ev.detalle})</span>` : ''}</span>
+                </div>`;
+            }).join('') : `<div style="color:var(--text3);font-size:11px;font-family:var(--mono);padding:6px 0">Sin eventos registrados en esta sesión</div>`;
+            return `<div class="card" style="margin-bottom:6px;padding:0;overflow:hidden">
+                <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'; this.querySelector('.adm-chev').style.transform=this.nextElementSibling.style.display==='block'?'rotate(180deg)':'rotate(0deg)'"
+                    style="padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px">
+                    <div style="flex:1;min-width:0">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+                            <span style="font-weight:700;font-size:13px;color:var(--text)">${s.nombre}</span>
+                            <span style="font-family:var(--mono);font-size:10px;color:${s.activo?'var(--success)':'var(--text3)'}">${dur}</span>
+                        </div>
+                        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:2px">${fecha}</div>
+                        ${funcs !== '—' ? `<div style="font-size:10px;color:var(--accent);font-family:var(--mono)">Usó: ${funcs}</div>` : ''}
+                    </div>
+                    <svg class="adm-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;transition:transform 0.2s;color:var(--text3)"><path d="M6 9l6 6 6-6"/></svg>
+                </div>
+                <div style="display:none;padding:10px 12px;border-top:1px solid var(--border);background:var(--surface2)">
+                    <div style="font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;margin-bottom:6px">TIMELINE DE ACTIVIDAD</div>
+                    ${detalleHTML}
+                    <div style="margin-top:8px;font-size:10px;font-family:var(--mono);color:var(--text3)">Total: ${eventos.length} evento${eventos.length!==1?'s':''}</div>
+                </div>
             </div>`;
         }).join('');
     } catch (e) {
@@ -6546,8 +6838,8 @@ _auth.onAuthStateChanged(async (user) => {
                 await registrarSesion(user);
                 escucharBroadcasts(user);
                 if (_fbIsAdmin) {
+                    adminCargarDashboard();
                     adminCargarOnline();
-                    adminCargarActividad();
                     adminEscucharNotifs();
                 }
             } catch (e) {
@@ -6602,18 +6894,82 @@ init();
 </div>
 <!-- SCREEN ADMIN: Panel de Control (solo admin) -->
 <div id="screen-admin" class="screen">
-    <div class="container">
-        <div class="screen-header" style="padding-bottom:6px">
-            <span class="screen-title">Panel Admin</span>
-            <span id="admin-online-dot" style="display:flex;align-items:center;gap:5px;font-size:10px;font-family:var(--mono);color:var(--text3)">
-                <span style="width:8px;height:8px;border-radius:50%;background:#16a34a;display:inline-block;box-shadow:0 0 0 2px rgba(22,163,74,0.3);animation:pulse 2s infinite"></span>
-                EN VIVO
-            </span>
+    <!-- SUB-TAB BAR ADMIN -->
+    <div style="position:sticky;top:0;z-index:50;background:var(--glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border-bottom:1px solid var(--border)">
+        <div class="container" style="padding-top:10px;padding-bottom:0">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <span class="screen-title" style="font-size:16px">Panel Admin</span>
+                <span id="admin-online-dot" style="display:flex;align-items:center;gap:5px;font-size:10px;font-family:var(--mono);color:var(--success)">
+                    <span style="width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block;animation:pulse 2s infinite"></span>EN VIVO
+                </span>
+            </div>
+            <div style="display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;padding-bottom:10px">
+                <button onclick="adminTab('dashboard')" id="atab-dashboard" class="sub-tab-btn active" style="white-space:nowrap;font-size:11px">📊 Dashboard</button>
+                <button onclick="adminTab('usuarios')" id="atab-usuarios" class="sub-tab-btn" style="white-space:nowrap;font-size:11px">👥 Usuarios</button>
+                <button onclick="adminTab('eventos')" id="atab-eventos" class="sub-tab-btn" style="white-space:nowrap;font-size:11px">📋 Eventos</button>
+                <button onclick="adminTab('mensajes')" id="atab-mensajes" class="sub-tab-btn" style="white-space:nowrap;font-size:11px">📢 Mensajes</button>
+            </div>
         </div>
+    </div>
 
-        <!-- Notificación broadcast -->
-        <div class="card" style="margin-bottom:10px">
-            <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;margin-bottom:8px">📢 ENVIAR MENSAJE A TODOS LOS USUARIOS</div>
+    <!-- PANEL: DASHBOARD -->
+    <div id="apanel-dashboard" class="container" style="padding-top:12px">
+        <!-- KPIs -->
+        <div id="admin-kpis" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+            <div class="card" style="padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--accent)" id="kpi-sesiones">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">SESIONES 30d</div></div>
+            <div class="card" style="padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--success)" id="kpi-cotizaciones">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">COTIZACIONES</div></div>
+            <div class="card" style="padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--warning)" id="kpi-busquedas">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">BÚSQUEDAS</div></div>
+            <div class="card" style="padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--info)" id="kpi-usuarios">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">USUARIOS ÚNICOS</div></div>
+        </div>
+        <!-- Actividad por día -->
+        <div class="section-divider-label">ACTIVIDAD ÚLTIMOS 14 DÍAS</div>
+        <div class="card" style="padding:14px;margin-bottom:12px">
+            <div id="admin-chart-dias" style="min-height:80px;display:flex;align-items:flex-end;gap:3px;justify-content:space-between"></div>
+            <div id="admin-chart-labels" style="display:flex;justify-content:space-between;margin-top:4px;font-size:9px;font-family:var(--mono);color:var(--text3)"></div>
+        </div>
+        <!-- Top eventos -->
+        <div class="section-divider-label">FUNCIONES MÁS USADAS (30d)</div>
+        <div id="admin-stats-chart" class="card" style="padding:14px;margin-bottom:12px;min-height:60px">
+            <div style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:12px 0">Cargando...</div>
+        </div>
+        <!-- Top búsquedas -->
+        <div class="section-divider-label">BÚSQUEDAS MÁS FRECUENTES</div>
+        <div id="admin-top-busquedas" class="card" style="padding:14px;margin-bottom:12px;min-height:40px"></div>
+        <!-- Top productos -->
+        <div class="section-divider-label">PRODUCTOS MÁS AGREGADOS</div>
+        <div id="admin-top-productos" class="card" style="padding:14px;margin-bottom:80px;min-height:40px"></div>
+    </div>
+
+    <!-- PANEL: USUARIOS -->
+    <div id="apanel-usuarios" class="container" style="padding-top:12px;display:none">
+        <div class="section-divider-label">EN LÍNEA AHORA</div>
+        <div id="admin-online-list" class="card" style="padding:10px;min-height:60px;margin-bottom:12px">
+            <div style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:12px 0">Cargando...</div>
+        </div>
+        <div class="section-divider-label">SESIONES RECIENTES (30 días)</div>
+        <div id="admin-activity-list" style="min-height:60px;margin-bottom:80px">
+            <div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando...</div>
+        </div>
+    </div>
+
+    <!-- PANEL: EVENTOS -->
+    <div id="apanel-eventos" class="container" style="padding-top:12px;display:none">
+        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+            <button onclick="adminFiltrarEventos('todos')" id="efil-todos" class="sub-tab-btn active" style="font-size:10px">Todos</button>
+            <button onclick="adminFiltrarEventos('cotizacion')" id="efil-cotizacion" class="sub-tab-btn" style="font-size:10px">💰 Cotizaciones</button>
+            <button onclick="adminFiltrarEventos('busqueda')" id="efil-busqueda" class="sub-tab-btn" style="font-size:10px">🔍 Búsquedas</button>
+            <button onclick="adminFiltrarEventos('kit_cargado')" id="efil-kit" class="sub-tab-btn" style="font-size:10px">📦 Kits</button>
+            <button onclick="adminFiltrarEventos('producto_agregado')" id="efil-producto" class="sub-tab-btn" style="font-size:10px">➕ Productos</button>
+        </div>
+        <div id="admin-eventos-list" style="min-height:60px;margin-bottom:80px">
+            <div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando...</div>
+        </div>
+    </div>
+
+    <!-- PANEL: MENSAJES -->
+    <div id="apanel-mensajes" class="container" style="padding-top:12px;display:none">
+        <div class="card" style="margin-bottom:12px">
+            <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;margin-bottom:8px">📢 ENVIAR MENSAJE A TODOS</div>
             <input type="text" id="admin-msg-input" placeholder="Ej: Nuevo kit ventana corrediza disponible" autocomplete="off"
                 style="margin-bottom:8px;font-size:14px" maxlength="120"
                 onkeydown="if(event.key==='Enter')adminSendBroadcast()">
@@ -6621,26 +6977,12 @@ init();
                 📤 ENVIAR NOTIFICACIÓN A TODOS
             </button>
         </div>
-
-        <!-- Usuarios en línea ahora -->
-        <div class="section-divider-label">USUARIOS ACTIVOS AHORA</div>
-        <div id="admin-online-list" class="card" style="padding:10px;min-height:60px">
-            <div style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:12px 0">Cargando...</div>
+        <div class="section-divider-label">NOTIFICACIONES</div>
+        <div class="card" style="padding:12px;margin-bottom:80px">
+            <button onclick="adminLimpiarNotifs()" class="btn-main ghost-btn" style="margin:0;font-size:12px;color:var(--danger);border-color:var(--danger)">
+                🗑 MARCAR TODAS COMO LEÍDAS
+            </button>
         </div>
-
-        <!-- Actividad reciente -->
-        <div class="section-divider-label" style="margin-top:12px">ACTIVIDAD RECIENTE (7 días)</div>
-        <div id="admin-activity-list" style="min-height:60px">
-            <div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando...</div>
-        </div>
-
-        <!-- Estadísticas de uso -->
-        <div class="section-divider-label" style="margin-top:12px">FUNCIONES MÁS USADAS</div>
-        <div id="admin-stats-chart" class="card" style="padding:14px;min-height:80px">
-            <div style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:12px 0">Cargando...</div>
-        </div>
-
-        <div style="height:80px"></div>
     </div>
 </div>
 
