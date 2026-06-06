@@ -3104,28 +3104,15 @@ function save() {
     // Guardar local siempre (respaldo offline)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     _priceEditorCache = { key: null, results: [] };
-    // Sincronizar con Firestore si hay usuario logueado
     const user = _auth.currentUser;
     if (!user) return;
-    const isAdmin = _fbIsAdmin;
 
-    // Admin guarda catálogo compartido
-    if (isAdmin) {
-        const catalogoData = {
-            prods: data.prods,
-            distributors: data.distributors,
-            kits: data.kits,
-            ventasConfig: data.ventasConfig,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-        _db.collection('catalogo').doc('main').set(catalogoData)
-            .catch(() => {
-                // Sin red — encolar para reintento automático
-                _enqueuePendingSync({ type: 'catalogo', uid: user.uid, data: catalogoData });
-            });
-    }
+    // ── OPTIMIZACIÓN 1: Escritura atómica con batch ──────────────────────────
+    // Antes: dos .set() independientes — si fallaba el segundo, quedaban
+    //        catálogo y historial desincronizados sin que nadie lo supiera.
+    // Ahora: un solo batch → ambos documentos se escriben juntos o ninguno.
+    const batch = _db.batch();
 
-    // Todos guardan su historial personal
     const historialData = {
         history: data.history,
         ventaHistory: data.ventaHistory || [],
@@ -3133,11 +3120,30 @@ function save() {
         displayName: user.displayName || user.email,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
-    _db.collection('usuarios').doc(user.uid).set(historialData, { merge: true })
-        .catch(() => {
-            // Sin red — encolar para reintento automático
-            _enqueuePendingSync({ type: 'historial', uid: user.uid, data: historialData });
-        });
+    batch.set(_db.collection('usuarios').doc(user.uid), historialData, { merge: true });
+
+    if (_fbIsAdmin) {
+        const catalogoData = {
+            prods: data.prods,
+            distributors: data.distributors,
+            kits: data.kits,
+            ventasConfig: data.ventasConfig,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        batch.set(_db.collection('catalogo').doc('main'), catalogoData);
+    }
+
+    batch.commit().catch(() => {
+        // Sin red — encolar ambos para reintento automático
+        if (_fbIsAdmin) {
+            _enqueuePendingSync({ type: 'catalogo', uid: user.uid, data: {
+                prods: data.prods, distributors: data.distributors,
+                kits: data.kits, ventasConfig: data.ventasConfig,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }});
+        }
+        _enqueuePendingSync({ type: 'historial', uid: user.uid, data: historialData });
+    });
 }
 function showToast(msg, type = 'success') {
     const t = document.getElementById('toast');
@@ -6387,18 +6393,24 @@ async function trackEvento(tipo, detalle) {
         } else if (detalle !== undefined) {
             ev.detalle = detalle;
         }
-        await _sessionRef.update({
+        // ── OPTIMIZACIÓN 3: batch en trackEvento ─────────────────────────────
+        // Antes: dos writes independientes (_sessionRef.update + eventos_global.add)
+        //        = 2 round-trips a Firestore por cada evento de navegación.
+        // Ahora: un solo batch → 1 round-trip, menor latencia y menor cuota usada.
+        const batch = _db.batch();
+        batch.update(_sessionRef, {
             eventos: firebase.firestore.FieldValue.arrayUnion(ev),
             ultimaActividad: Date.now()
         });
-        // Also write to eventos_global for dashboard aggregation
-        await _db.collection('eventos_global').add({
+        const globalRef = _db.collection('eventos_global').doc();
+        batch.set(globalRef, {
             ...ev,
             uid: _currentUser.uid,
             nombre: _currentUser.displayName || _currentUser.email,
             email: _currentUser.email,
-            fecha: new Date().toISOString().substring(0,10)
+            fecha: new Date().toISOString().substring(0, 10)
         });
+        await batch.commit();
     } catch (e) {}
 }
 
@@ -6414,6 +6426,11 @@ function showAdminNotification(titulo, cuerpo) {
 }
 
 function escucharBroadcasts(user) {
+    // ── OPTIMIZACIÓN 4: el admin no necesita escuchar sus propios broadcasts ──
+    // Antes: el listener corría para TODOS los usuarios, incluyendo el admin
+    //        que es quien los genera — generaba una lectura continua innecesaria.
+    // Ahora: solo se registra para usuarios normales.
+    if (_fbIsAdmin) return;
     const unsub = _db.collection('broadcasts').orderBy('timestamp', 'desc').limit(1)
         .onSnapshot(snap => {
             snap.docChanges().forEach(change => {
@@ -7031,6 +7048,11 @@ _auth.onAuthStateChanged(async (user) => {
                     adminCargarDashboard();
                     adminCargarOnline();
                     adminEscucharNotifs();
+                    // ── OPTIMIZACIÓN 2: Limpieza automática de datos viejos ──
+                    // Antes: solo se limpiaba manualmente desde el panel.
+                    // Ahora: se lanza sola al entrar como admin (silenciosa,
+                    //        no bloquea nada, límite 50/100 docs por run).
+                    adminLimpiarDatos().catch(() => {});
                 }
             } catch (e) {
                 console.warn('[Analytics] Error al inicializar:', e.message);
