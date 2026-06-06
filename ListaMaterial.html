@@ -6466,9 +6466,33 @@ function adminTab(tab) {
         if (panel) panel.style.display = t === tab ? '' : 'none';
         if (btn)   btn.classList.toggle('active', t === tab);
     });
+    // Actualizar encabezado
+    const backBtn = document.getElementById('admin-back-btn');
+    const titleEl = document.getElementById('admin-panel-title');
+    const titles  = { dashboard:'Panel Admin', usuarios:'Sesiones', eventos:'Eventos', mensajes:'Mensajes' };
+    if (backBtn) backBtn.style.display = tab === 'dashboard' ? 'none' : '';
+    if (titleEl) titleEl.textContent = titles[tab] || 'Panel Admin';
     if (tab === 'dashboard') adminCargarDashboard();
     if (tab === 'usuarios')  { adminCargarOnline(); adminCargarActividad(); }
     if (tab === 'eventos')   adminCargarEventos();
+}
+
+// Navega desde un KPI card a su detalle correspondiente
+function adminVerDetalle(tipo) {
+    if (tipo === 'usuarios') {
+        adminTab('usuarios');
+    } else {
+        // sesiones, cotizacion, busqueda → panel eventos con filtro
+        const filtroMap = { sesiones: 'todos', cotizacion: 'cotizacion', busqueda: 'busqueda' };
+        const filtro = filtroMap[tipo] || 'todos';
+        adminTab('eventos');
+        // Esperar a que el panel esté cargado antes de aplicar filtro
+        setTimeout(() => adminFiltrarEventos(filtro), 150);
+    }
+}
+
+function adminVolverDashboard() {
+    adminTab('dashboard');
 }
 
 // ── Dashboard principal ──
@@ -7109,18 +7133,15 @@ init();
 <div id="screen-admin" class="screen">
     <!-- SUB-TAB BAR ADMIN -->
     <div style="position:sticky;top:0;z-index:50;background:var(--glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border-bottom:1px solid var(--border)">
-        <div class="container" style="padding-top:10px;padding-bottom:0">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                <span class="screen-title" style="font-size:16px">Panel Admin</span>
+        <div class="container" style="padding-top:10px;padding-bottom:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <div style="display:flex;align-items:center;gap:8px">
+                    <button id="admin-back-btn" onclick="adminVolverDashboard()" style="display:none;background:var(--accent-dim);border:none;border-radius:8px;padding:4px 10px;font-size:11px;font-family:var(--mono);color:var(--accent);cursor:pointer;letter-spacing:.5px">← VOLVER</button>
+                    <span id="admin-panel-title" class="screen-title" style="font-size:16px">Panel Admin</span>
+                </div>
                 <span id="admin-online-dot" style="display:flex;align-items:center;gap:5px;font-size:10px;font-family:var(--mono);color:var(--success)">
                     <span style="width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block;animation:pulse 2s infinite"></span>EN VIVO
                 </span>
-            </div>
-            <div style="display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;padding-bottom:10px">
-                <button onclick="adminTab('dashboard')" id="atab-dashboard" class="sub-tab-btn active" style="white-space:nowrap;font-size:11px">📊 Dashboard</button>
-                <button onclick="adminTab('usuarios')" id="atab-usuarios" class="sub-tab-btn" style="white-space:nowrap;font-size:11px">👥 Usuarios</button>
-                <button onclick="adminTab('eventos')" id="atab-eventos" class="sub-tab-btn" style="white-space:nowrap;font-size:11px">📋 Eventos</button>
-                <button onclick="adminTab('mensajes')" id="atab-mensajes" class="sub-tab-btn" style="white-space:nowrap;font-size:11px">📢 Mensajes</button>
             </div>
         </div>
     </div>
@@ -7129,10 +7150,10 @@ init();
     <div id="apanel-dashboard" class="container" style="padding-top:12px">
         <!-- KPIs -->
         <div id="admin-kpis" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
-            <div class="card" style="padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--accent)" id="kpi-sesiones">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">SESIONES 30d</div></div>
-            <div class="card" style="padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--success)" id="kpi-cotizaciones">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">COTIZACIONES</div></div>
-            <div class="card" style="padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--warning)" id="kpi-busquedas">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">BÚSQUEDAS</div></div>
-            <div class="card" style="padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--info)" id="kpi-usuarios">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">USUARIOS ÚNICOS</div></div>
+            <div class="card" onclick="adminVerDetalle('sesiones')" style="padding:12px;text-align:center;cursor:pointer;transition:transform .15s,box-shadow .15s" onpointerdown="this.style.transform='scale(.96)'" onpointerup="this.style.transform=''" onpointercancel="this.style.transform=''"><div style="font-size:22px;font-weight:800;color:var(--accent)" id="kpi-sesiones">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">SESIONES 30d</div></div>
+            <div class="card" onclick="adminVerDetalle('cotizacion')" style="padding:12px;text-align:center;cursor:pointer;transition:transform .15s,box-shadow .15s" onpointerdown="this.style.transform='scale(.96)'" onpointerup="this.style.transform=''" onpointercancel="this.style.transform=''"><div style="font-size:22px;font-weight:800;color:var(--success)" id="kpi-cotizaciones">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">COTIZACIONES</div></div>
+            <div class="card" onclick="adminVerDetalle('busqueda')" style="padding:12px;text-align:center;cursor:pointer;transition:transform .15s,box-shadow .15s" onpointerdown="this.style.transform='scale(.96)'" onpointerup="this.style.transform=''" onpointercancel="this.style.transform=''"><div style="font-size:22px;font-weight:800;color:var(--warning)" id="kpi-busquedas">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">BÚSQUEDAS</div></div>
+            <div class="card" onclick="adminVerDetalle('usuarios')" style="padding:12px;text-align:center;cursor:pointer;transition:transform .15s,box-shadow .15s" onpointerdown="this.style.transform='scale(.96)'" onpointerup="this.style.transform=''" onpointercancel="this.style.transform=''"><div style="font-size:22px;font-weight:800;color:var(--info)" id="kpi-usuarios">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">USUARIOS ÚNICOS</div></div>
         </div>
         <!-- Actividad por día -->
         <div class="section-divider-label">ACTIVIDAD POR FUNCIÓN (30d)</div>
@@ -7153,7 +7174,12 @@ init();
         <div id="admin-top-busquedas" class="card" style="padding:14px;margin-bottom:12px;min-height:40px"></div>
         <!-- Top productos -->
         <div class="section-divider-label">PRODUCTOS MÁS AGREGADOS</div>
-        <div id="admin-top-productos" class="card" style="padding:14px;margin-bottom:80px;min-height:40px"></div>
+        <div id="admin-top-productos" class="card" style="padding:14px;margin-bottom:12px;min-height:40px"></div>
+        <!-- Accesos secundarios -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:80px">
+            <button onclick="adminTab('usuarios')" class="btn-main ghost-btn" style="margin:0;font-size:11px;font-family:var(--mono);letter-spacing:.5px">👥 VER SESIONES</button>
+            <button onclick="adminTab('mensajes')" class="btn-main ghost-btn" style="margin:0;font-size:11px;font-family:var(--mono);letter-spacing:.5px">📢 MENSAJES</button>
+        </div>
     </div>
 
     <!-- PANEL: USUARIOS -->
