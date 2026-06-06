@@ -4546,7 +4546,7 @@ function loadKitToStaging(acumular) {
     if(!kitId) { showToast('Selecciona una línea primero','info'); return; }
     const kit = getKitById(kitId);
     if(!kit) return;
-    trackEvento('kit_cargado', kit.name?.substring(0,30) || kitId);
+    trackEvento('kit_cargado', { detalle: kit.name?.substring(0,30) || kitId, color: (document.getElementById('kit-color-select')?.value||'').toUpperCase()||'Natural' });
     const colorChosen = (document.getElementById('kit-color-select')?.value || '').trim().toUpperCase();
     const validItems = kit.items.filter(item => data.prods.some(p=>p.id == item.prodId));
     if(!validItems.length) { showToast('La línea no tiene materiales válidos','info'); return; }
@@ -6481,9 +6481,12 @@ function adminTab(tab) {
 function adminVerDetalle(tipo) {
     if (tipo === 'usuarios') {
         adminTab('usuarios');
+    } else if (tipo === 'sesiones') {
+        adminTab('eventos');
+        setTimeout(() => adminFiltrarEventos('sesiones'), 150);
     } else {
-        // sesiones, cotizacion, busqueda → panel eventos con filtro
-        const filtroMap = { sesiones: 'todos', cotizacion: 'cotizacion', busqueda: 'busqueda' };
+        // cotizacion, busqueda → panel eventos con filtro
+        const filtroMap = { cotizacion: 'cotizacion', busqueda: 'busqueda' };
         const filtro = filtroMap[tipo] || 'todos';
         adminTab('eventos');
         // Esperar a que el panel esté cargado antes de aplicar filtro
@@ -6709,7 +6712,7 @@ async function adminCargarEventos() {
 
 function adminFiltrarEventos(tipo) {
     _adminEventosFiltro = tipo;
-    ['todos','cotizacion','busqueda','kit_cargado','producto_agregado'].forEach(t => {
+    ['todos','sesiones','cotizacion','busqueda','kit_cargado','producto_agregado'].forEach(t => {
         const id = t === 'kit_cargado' ? 'efil-kit' : t === 'producto_agregado' ? 'efil-producto' : 'efil-' + t;
         const btn = document.getElementById(id);
         if (btn) btn.classList.toggle('active', t === tipo);
@@ -6720,34 +6723,84 @@ function adminFiltrarEventos(tipo) {
 function adminRenderEventosFiltrados() {
     const el = document.getElementById('admin-eventos-list');
     if (!el) return;
-    const labels = { 'busqueda':'🔍','kit_cargado':'📦','cotizacion':'💰','ventas':'🛒','pedidos':'📋','comparar':'⚖️','config':'⚙️','producto_agregado':'➕' };
+    const labels = { 'busqueda':'🔍','kit_cargado':'📦','cotizacion':'💰','ventas':'🛒','pedidos':'📋','comparar':'⚖️','config':'⚙️','producto_agregado':'➕','vidrio':'🪟' };
+
+    // ── Filtro SESIONES: muestra quién inició sesión y cuánto tiempo estuvo ──
+    if (_adminEventosFiltro === 'sesiones') {
+        el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando sesiones...</div>`;
+        const hace30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        _db.collection('sesiones').where('inicio','>',hace30).orderBy('inicio','desc').limit(100).get()
+            .then(snap => {
+                const sesiones = snap.docs.map(d => d.data()).filter(d => d.email !== ADMIN_EMAIL);
+                if (!sesiones.length) {
+                    el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Sin sesiones registradas</div>`;
+                    return;
+                }
+                el.innerHTML = sesiones.map(s => {
+                    const ds = s.duracionSegundos;
+                    const dur = ds
+                        ? (ds < 60 ? `${ds}s` : ds < 3600 ? `${Math.round(ds/60)} min` : `${Math.floor(ds/3600)}h ${Math.round((ds%3600)/60)}min`)
+                        : (s.activo ? '🟢 En línea ahora' : 'Sin cerrar');
+                    const fecha = new Date(s.inicio).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+                    return `<div class="card" style="margin-bottom:6px;padding:10px 12px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+                            <span style="font-size:14px;font-weight:700;color:var(--text)">👤 ${s.nombre||s.email}</span>
+                            <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:${s.activo?'var(--success)':'var(--accent)'}">${dur}</span>
+                        </div>
+                        <div style="font-family:var(--mono);font-size:10px;color:var(--text3)">${fecha}</div>
+                    </div>`;
+                }).join('');
+            }).catch(() => {
+                el.innerHTML = `<div class="card" style="color:var(--danger);font-size:12px;padding:14px">Error cargando sesiones</div>`;
+            });
+        return;
+    }
+
+    // ── Filtros normales desde eventos_global ──
     const lista = _adminEventosFiltro === 'todos'
-        ? _adminEventosCache
+        ? _adminEventosCache.filter(e => ['busqueda','kit_cargado','cotizacion','producto_agregado'].includes(e.tipo))
         : _adminEventosCache.filter(e => e.tipo === _adminEventosFiltro);
+
     if (!lista.length) {
         el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Sin eventos de este tipo</div>`;
         return;
     }
+
     el.innerHTML = lista.slice(0,80).map(e => {
         const hora = new Date(e.ts).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
         let detalle = '';
+        let subDetalle = '';
+
         if (e.tipo === 'cotizacion') {
-            detalle = `<span style="color:var(--success)">$${(e.total||0).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0})}</span> · ${e.cliente||'—'} · ${e.items||0} items`;
+            detalle = `<span style="color:var(--success);font-weight:700">$${(e.total||0).toLocaleString('es-MX',{maximumFractionDigits:0})}</span> · ${e.cliente||'—'} · ${e.items||0} artículos`;
         } else if (e.tipo === 'busqueda') {
-            detalle = `"${e.detalle||''}"`;
+            // Buscar el producto_agregado más cercano (mismo uid, ts posterior, max 60s)
+            const productoSig = _adminEventosCache.find(x =>
+                x.tipo === 'producto_agregado' && x.uid === e.uid && x.ts > e.ts && x.ts - e.ts < 60000
+            );
+            if (productoSig) {
+                detalle = `Seleccionó: <strong style="color:var(--text)">${productoSig.nombre||''}${productoSig.color?' · '+productoSig.color:''}</strong>`;
+                subDetalle = `<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:2px">Buscó: "${e.detalle||''}"</div>`;
+            } else {
+                detalle = `"${e.detalle||''}" <span style="color:var(--text3);font-size:10px">(sin selección)</span>`;
+            }
         } else if (e.tipo === 'kit_cargado') {
-            detalle = e.detalle || '';
+            const color = e.color && e.color !== 'NATURAL' && e.color !== '' ? ` · <span style="color:var(--text3)">${e.color}</span>` : '';
+            detalle = `<strong style="color:var(--text)">${e.detalle||''}</strong>${color}`;
         } else if (e.tipo === 'producto_agregado') {
-            detalle = `${e.nombre||''} ${e.color||''} <span style="color:var(--text3)">(${e.lista||''})</span>`;
+            detalle = `<strong>${e.nombre||''}</strong>${e.color?' · '+e.color:''}`;
+            if (e.lista) subDetalle = `<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:2px">${e.lista}</div>`;
         } else {
             detalle = e.detalle || '';
         }
+
         return `<div class="card" style="margin-bottom:6px;padding:10px 12px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
                 <span style="font-size:13px">${labels[e.tipo]||'•'} <strong style="color:var(--text)">${e.nombre||e.email||'—'}</strong></span>
                 <span style="font-family:var(--mono);font-size:10px;color:var(--text3)">${hora}</span>
             </div>
-            <div style="font-size:11px;color:var(--text2);font-family:var(--mono)">${detalle}</div>
+            <div style="font-size:11px;color:var(--text2)">${detalle}</div>
+            ${subDetalle}
         </div>`;
     }).join('');
 }
@@ -6841,59 +6894,95 @@ async function adminCargarActividad() {
     if (!_fbIsAdmin) return;
     const el = document.getElementById('admin-activity-list');
     if (!el) return;
-    const hace7dias = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    // ── FIX: ampliar a 30 días para ver todos los usuarios históricos ──
+    const hace30dias = Date.now() - 30 * 24 * 60 * 60 * 1000;
     try {
-        const snap = await _db.collection('sesiones').where('inicio', '>', hace7dias).orderBy('inicio', 'desc').limit(30).get();
+        const snap = await _db.collection('sesiones').where('inicio', '>', hace30dias).orderBy('inicio', 'desc').limit(100).get();
         const sesiones = snap.docs.map(d => d.data()).filter(d => d.email !== ADMIN_EMAIL);
         if (!sesiones.length) {
-            el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Sin actividad esta semana</div>`;
+            el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Sin actividad en los últimos 30 días</div>`;
             return;
         }
-        const funcCount = {};
-        sesiones.forEach(s => (s.eventos || []).forEach(ev => { funcCount[ev.tipo] = (funcCount[ev.tipo] || 0) + 1; }));
-        const statsEl = document.getElementById('admin-stats-chart');
-        if (statsEl && Object.keys(funcCount).length) {
-            const max = Math.max(...Object.values(funcCount));
-            const labels = { 'busqueda': '🔍 Búsqueda', 'kit_cargado': '📦 Kit cargado', 'cotizacion': '📄 Cotización', 'ventas': '🛒 Ventas', 'pedidos': '📋 Pedidos', 'comparar': '⚖️ Comparar' };
-            statsEl.innerHTML = Object.entries(funcCount).sort((a, b) => b[1] - a[1]).map(([k, v]) => `
-                <div style="margin-bottom:8px">
-                    <div style="display:flex;justify-content:space-between;font-size:11px;font-family:var(--mono);color:var(--text2);margin-bottom:3px"><span>${labels[k] || k}</span><span>${v}x</span></div>
-                    <div style="height:6px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:${Math.round(v / max * 100)}%;background:var(--accent);border-radius:4px"></div></div>
-                </div>`).join('');
-        } else if (statsEl) {
-            statsEl.innerHTML = `<div style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:12px 0">Sin datos de uso aún</div>`;
-        }
-        const labelEvento = { 'busqueda': '🔍 Búsqueda', 'kit_cargado': '📦 Kit cargado', 'cotizacion': '📄 Cotización', 'ventas': '🛒 Ventas', 'pedidos': '📋 Pedidos', 'comparar': '⚖️ Comparar', 'config': '⚙️ Config' };
-        el.innerHTML = sesiones.slice(0, 15).map((s, i) => {
+
+        // ── TIPOS DE EVENTO ÚTILES (excluir navegación interna de pantallas) ──
+        const TIPOS_UTILES = new Set(['busqueda','kit_cargado','cotizacion','ventas','pedidos','comparar','config','producto_agregado','vidrio']);
+        const labelEvento = {
+            'busqueda': '🔍 Búsqueda',
+            'kit_cargado': '📦 Kit cargado',
+            'cotizacion': '💰 Cotización',
+            'ventas': '🛒 Ventas',
+            'pedidos': '📋 Pedidos',
+            'comparar': '⚖️ Comparar',
+            'config': '⚙️ Config',
+            'producto_agregado': '➕ Producto agregado',
+            'vidrio': '🪟 Vidrio/Espejo'
+        };
+
+        el.innerHTML = sesiones.map((s) => {
+            // Duración
             const ds = s.duracionSegundos;
-            const dur = ds ? (ds < 60 ? `${ds}s` : ds < 3600 ? `${Math.round(ds / 60)}min` : `${Math.floor(ds / 3600)}h ${Math.round((ds % 3600) / 60)}min`) : (s.activo ? '🟢 En línea' : '—');
-            const fecha = new Date(s.inicio).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-            const funcs = [...new Set((s.eventos || []).map(e => e.tipo))].join(', ') || '—';
-            const eventos = (s.eventos || []);
-            const detalleHTML = eventos.length ? eventos.map(ev => {
-                const hora = new Date(ev.ts).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                return `<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px">
-                    <span style="color:var(--text3);font-family:var(--mono);min-width:60px">${hora}</span>
-                    <span style="color:var(--text2)">${labelEvento[ev.tipo] || ev.tipo}${ev.detalle && ev.detalle !== ev.tipo ? ` <span style="color:var(--text3)">(${ev.detalle})</span>` : ''}</span>
-                </div>`;
-            }).join('') : `<div style="color:var(--text3);font-size:11px;font-family:var(--mono);padding:6px 0">Sin eventos registrados en esta sesión</div>`;
+            const dur = ds
+                ? (ds < 60 ? `${ds}s` : ds < 3600 ? `${Math.round(ds/60)} min` : `${Math.floor(ds/3600)}h ${Math.round((ds%3600)/60)}min`)
+                : (s.activo ? '🟢 En línea' : '—');
+
+            // Fecha/hora de inicio
+            const fechaInicio = new Date(s.inicio).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+
+            // Filtrar solo eventos útiles (quitar screen-*)
+            const eventosUtiles = (s.eventos || []).filter(ev => TIPOS_UTILES.has(ev.tipo));
+
+            // Resumen de funciones usadas (sin duplicados)
+            const funcUsadas = [...new Set(eventosUtiles.map(e => labelEvento[e.tipo] || e.tipo))];
+
+            // Timeline de eventos útiles
+            const detalleHTML = eventosUtiles.length
+                ? eventosUtiles.map(ev => {
+                    const hora = new Date(ev.ts).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+                    let desc = labelEvento[ev.tipo] || ev.tipo;
+                    // Detalle enriquecido por tipo
+                    if (ev.tipo === 'busqueda') {
+                        // Buscar producto seleccionado inmediatamente después en la sesión
+                        const idx = (s.eventos||[]).indexOf(ev);
+                        const siguiente = (s.eventos||[]).slice(idx+1, idx+4).find(x => x.tipo === 'producto_agregado');
+                        if (siguiente) {
+                            desc = `🔍 Buscó → seleccionó <strong>${siguiente.nombre||''}${siguiente.color?' '+siguiente.color:''}</strong>`;
+                        } else {
+                            desc = `🔍 Búsqueda: "${ev.detalle||''}"`;
+                        }
+                    } else if (ev.tipo === 'kit_cargado') {
+                        const colorKit = ev.color && ev.color !== '' ? ` · ${ev.color}` : '';
+                        desc = `📦 Kit: <strong>${ev.detalle||''}</strong>${colorKit}`;
+                    } else if (ev.tipo === 'cotizacion') {
+                        desc = `💰 Cotización <strong>${ev.cliente||'cliente'}</strong> · $${(ev.total||0).toLocaleString('es-MX',{maximumFractionDigits:0})} · ${ev.items||0} items`;
+                    } else if (ev.tipo === 'producto_agregado') {
+                        desc = `➕ Agregó: <strong>${ev.nombre||''}</strong>${ev.color?' ('+ev.color+')':''}`;
+                    }
+                    return `<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;align-items:flex-start">
+                        <span style="color:var(--text3);font-family:var(--mono);min-width:44px;flex-shrink:0">${hora}</span>
+                        <span style="color:var(--text2);line-height:1.4">${desc}</span>
+                    </div>`;
+                }).join('')
+                : `<div style="color:var(--text3);font-size:11px;font-family:var(--mono);padding:6px 0">Solo navegó por la app</div>`;
+
             return `<div class="card" style="margin-bottom:6px;padding:0;overflow:hidden">
                 <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'; this.querySelector('.adm-chev').style.transform=this.nextElementSibling.style.display==='block'?'rotate(180deg)':'rotate(0deg)'"
                     style="padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px">
                     <div style="flex:1;min-width:0">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-                            <span style="font-weight:700;font-size:13px;color:var(--text)">${s.nombre}</span>
-                            <span style="font-family:var(--mono);font-size:10px;color:${s.activo?'var(--success)':'var(--text3)'}">${dur}</span>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+                            <span style="font-weight:700;font-size:14px;color:var(--text)">${s.nombre||s.email}</span>
+                            <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:${s.activo?'var(--success)':'var(--text3)'}">${dur}</span>
                         </div>
-                        <div style="font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:2px">${fecha}</div>
-                        ${funcs !== '—' ? `<div style="font-size:10px;color:var(--accent);font-family:var(--mono)">Usó: ${funcs}</div>` : ''}
+                        <div style="font-family:var(--mono);font-size:10px;color:var(--text3)">${fechaInicio}</div>
+                        ${funcUsadas.length ? `<div style="font-size:10px;color:var(--accent);font-family:var(--mono);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Usó: ${funcUsadas.join(', ')}</div>` : ''}
                     </div>
                     <svg class="adm-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;transition:transform 0.2s;color:var(--text3)"><path d="M6 9l6 6 6-6"/></svg>
                 </div>
                 <div style="display:none;padding:10px 12px;border-top:1px solid var(--border);background:var(--surface2)">
-                    <div style="font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;margin-bottom:6px">TIMELINE DE ACTIVIDAD</div>
+                    <div style="font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;margin-bottom:6px">ACTIVIDAD EN LA SESIÓN</div>
                     ${detalleHTML}
-                    <div style="margin-top:8px;font-size:10px;font-family:var(--mono);color:var(--text3)">Total: ${eventos.length} evento${eventos.length!==1?'s':''}</div>
+                    <div style="margin-top:8px;font-size:10px;font-family:var(--mono);color:var(--text3)">
+                        ${eventosUtiles.length} accion${eventosUtiles.length!==1?'es':''} · ${(s.eventos||[]).length} eventos totales
+                    </div>
                 </div>
             </div>`;
         }).join('');
@@ -7198,6 +7287,7 @@ init();
     <div id="apanel-eventos" class="container" style="padding-top:12px;display:none">
         <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
             <button onclick="adminFiltrarEventos('todos')" id="efil-todos" class="sub-tab-btn active" style="font-size:10px">Todos</button>
+            <button onclick="adminFiltrarEventos('sesiones')" id="efil-sesiones" class="sub-tab-btn" style="font-size:10px">👤 Sesiones</button>
             <button onclick="adminFiltrarEventos('cotizacion')" id="efil-cotizacion" class="sub-tab-btn" style="font-size:10px">💰 Cotizaciones</button>
             <button onclick="adminFiltrarEventos('busqueda')" id="efil-busqueda" class="sub-tab-btn" style="font-size:10px">🔍 Búsquedas</button>
             <button onclick="adminFiltrarEventos('kit_cargado')" id="efil-kit" class="sub-tab-btn" style="font-size:10px">📦 Kits</button>
