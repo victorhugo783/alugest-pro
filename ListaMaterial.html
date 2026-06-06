@@ -27,6 +27,21 @@
     firebase.initializeApp(firebaseConfig);
     const _auth = firebase.auth();
     const _db   = firebase.firestore();
+
+    // ── PERSISTENCIA OFFLINE ──────────────────────────────────────────────────
+    // Guarda todos los datos de Firestore en IndexedDB del dispositivo.
+    // Sin internet: .get() / onSnapshot sirven desde caché local sin errores.
+    // Al reconectarse: Firestore sincroniza automáticamente los cambios pendientes.
+    _db.enablePersistence({ synchronizeTabs: false })
+        .catch(err => {
+            if (err.code === 'failed-precondition') {
+                // Más de una pestaña abierta — la persistencia solo aplica a una
+                console.warn('[AluGest] Persistencia: múltiples pestañas, modo red activo.');
+            } else if (err.code === 'unimplemented') {
+                // Navegador no soporta IndexedDB (muy raro en 2024)
+                console.warn('[AluGest] Persistencia: navegador no compatible.');
+            }
+        });
     </script>
     <style>
         /* ─── LIGHT MODE (default) ─── */
@@ -3030,6 +3045,61 @@ function init() {
     const pedCC = document.getElementById('ped-costo-corte'); if(pedCC) pedCC.value = vc.pedCostoCorte ?? 10;
     updateVentasMargenPill();
 }
+// ─────────────────────────────────────────────────────────────────────────────
+//  COLA OFFLINE — guarda escrituras fallidas y las reintenta al reconectarse
+//  Clave localStorage: 'alugest_pending_sync'
+// ─────────────────────────────────────────────────────────────────────────────
+const PENDING_KEY = 'alugest_pending_sync';
+
+function _enqueuePendingSync(payload) {
+    // payload = { type: 'catalogo'|'historial', uid, data, ts }
+    try {
+        const queue = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]');
+        // Reemplaza entradas previas del mismo tipo+uid para no acumular duplicados
+        const filtered = queue.filter(e => !(e.type === payload.type && e.uid === payload.uid));
+        filtered.push({ ...payload, ts: Date.now() });
+        localStorage.setItem(PENDING_KEY, JSON.stringify(filtered));
+    } catch (e) { /* localStorage lleno — ignorar */ }
+}
+
+async function _flushPendingSync() {
+    const raw = localStorage.getItem(PENDING_KEY);
+    if (!raw) return;
+    let queue;
+    try { queue = JSON.parse(raw); } catch { localStorage.removeItem(PENDING_KEY); return; }
+    if (!queue.length) return;
+
+    const user = _auth.currentUser;
+    if (!user) return; // No hay sesión activa, esperar
+
+    const failed = [];
+    for (const entry of queue) {
+        try {
+            if (entry.type === 'catalogo' && _fbIsAdmin) {
+                await _db.collection('catalogo').doc('main').set(entry.data, { merge: true });
+            } else if (entry.type === 'historial') {
+                await _db.collection('usuarios').doc(entry.uid).set(entry.data, { merge: true });
+            }
+            // Éxito — no re-encolar
+        } catch (e) {
+            failed.push(entry); // Sigue sin red — volver a guardar
+        }
+    }
+
+    if (failed.length) {
+        localStorage.setItem(PENDING_KEY, JSON.stringify(failed));
+    } else {
+        localStorage.removeItem(PENDING_KEY);
+        showToast('☁️ Datos sincronizados con la nube', 'success');
+    }
+}
+
+// Escuchar reconexión — intentar vaciar la cola automáticamente
+window.addEventListener('online', () => {
+    console.log('[AluGest] Red disponible — sincronizando cola offline...');
+    setTimeout(_flushPendingSync, 1500); // Pequeña espera para que la red estabilice
+});
+
 function save() {
     // Guardar local siempre (respaldo offline)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -3038,24 +3108,36 @@ function save() {
     const user = _auth.currentUser;
     if (!user) return;
     const isAdmin = _fbIsAdmin;
+
     // Admin guarda catálogo compartido
     if (isAdmin) {
-        _db.collection('catalogo').doc('main').set({
+        const catalogoData = {
             prods: data.prods,
             distributors: data.distributors,
             kits: data.kits,
             ventasConfig: data.ventasConfig,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }).catch(e => console.warn('Error guardando catálogo:', e));
+        };
+        _db.collection('catalogo').doc('main').set(catalogoData)
+            .catch(() => {
+                // Sin red — encolar para reintento automático
+                _enqueuePendingSync({ type: 'catalogo', uid: user.uid, data: catalogoData });
+            });
     }
+
     // Todos guardan su historial personal
-    _db.collection('usuarios').doc(user.uid).set({
+    const historialData = {
         history: data.history,
         ventaHistory: data.ventaHistory || [],
         lastBackupCount: data.lastBackupCount || 0,
         displayName: user.displayName || user.email,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true }).catch(e => console.warn('Error guardando historial:', e));
+    };
+    _db.collection('usuarios').doc(user.uid).set(historialData, { merge: true })
+        .catch(() => {
+            // Sin red — encolar para reintento automático
+            _enqueuePendingSync({ type: 'historial', uid: user.uid, data: historialData });
+        });
 }
 function showToast(msg, type = 'success') {
     const t = document.getElementById('toast');
@@ -6900,9 +6982,12 @@ _auth.onAuthStateChanged(async (user) => {
         aplicarVisibilidadAdmin(_fbIsAdmin);
         aplicarPermisosUsuario(_fbIsAdmin);
 
-        // ③ Cargar datos de Firestore
-        await fbLoadCatalogo();
-        await fbLoadHistorial(user.uid);
+        // ③ Cargar datos de Firestore en PARALELO (no en serie)
+        // Antes: ~800ms + ~600ms = ~1400ms. Ahora: max(~800ms, ~600ms) = ~800ms
+        await Promise.all([
+            fbLoadCatalogo(),
+            fbLoadHistorial(user.uid)
+        ]);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 
         // ④ Mostrar app
@@ -6935,8 +7020,10 @@ _auth.onAuthStateChanged(async (user) => {
         }, 500);
 
         // ⑥ Analytics + FCM — no bloquea la UI, _fbIsAdmin ya está definido
+        // También intenta vaciar cola offline de sesiones anteriores sin red
         (async () => {
             try {
+                await _flushPendingSync(); // ← reintento de escrituras pendientes
                 await initFCM(user);
                 await registrarSesion(user);
                 escucharBroadcasts(user);
