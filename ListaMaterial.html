@@ -3088,7 +3088,7 @@ function navigate(id, btn) {
     if (id === 'screen-history') checkBackupAlert();
     if (id === 'screen-config') { checkDeshacerBtn(); renderKitsScreen(); if(_fbIsAdmin) renderPriceEditor(); aplicarPermisosUsuario(_fbIsAdmin); }
     if (id === 'screen-comparar') { populateCmpSelectors(); }
-    if (id === 'screen-ventas') { pedRenderAll(); vidRenderAll(); if (document.getElementById('spanel-cotiz')?.classList.contains('active')) renderVentaHistory(); switchVentasTab('vidrio'); }
+    if (id === 'screen-ventas') { pedRenderAll(); vidRenderAll(); if (document.getElementById('spanel-cotiz')?.classList.contains('active')) renderVentaHistory(); }
     if (id === 'screen-admin') { adminTab('dashboard'); }
     window.scrollTo({ top: 0, behavior: 'instant' });
     renderAll();
