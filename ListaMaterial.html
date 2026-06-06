@@ -191,6 +191,12 @@
             font-family: var(--font);
         }
 
+        /* ── KPI Cards interactivas ── */
+        .kpi-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-lg) !important; }
+        .kpi-card:active { transform: scale(0.97); }
+        /* ── Drilldown filter buttons ── */
+        #admin-drilldown-filters button:active { transform: scale(0.95); }
+
         .search-sticky {
             position: sticky;
             top: 0;
@@ -2571,15 +2577,15 @@
 
         <!-- Sub-tabs -->
         <div class="sub-tab-bar">
-            <button class="sub-tab-btn active" id="stab-metro" onclick="switchVentasTab('metro')">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 3l12 18M18 3L6 21"/><circle cx="6" cy="3" r="1.8" fill="currentColor" stroke="none"/><circle cx="18" cy="3" r="1.8" fill="currentColor" stroke="none"/></svg>
-                Metro Lineal<span id="badge-metro" style="display:none;background:var(--accent);color:#fff;border-radius:9px;padding:1px 6px;font-size:8px;margin-left:3px"></span>
-                <span class="stab-sub">Perfiles de aluminio por metro</span>
-            </button>
-            <button class="sub-tab-btn" id="stab-vidrio" onclick="switchVentasTab('vidrio')">
+            <button class="sub-tab-btn active" id="stab-vidrio" onclick="switchVentasTab('vidrio')">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
                 Vidrio / Espejo<span id="badge-vidrio" style="display:none;background:var(--accent);color:#fff;border-radius:9px;padding:1px 6px;font-size:8px;margin-left:3px"></span>
                 <span class="stab-sub">Precio por m² a medida</span>
+            </button>
+            <button class="sub-tab-btn" id="stab-metro" onclick="switchVentasTab('metro')">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 3l12 18M18 3L6 21"/><circle cx="6" cy="3" r="1.8" fill="currentColor" stroke="none"/><circle cx="18" cy="3" r="1.8" fill="currentColor" stroke="none"/></svg>
+                Metro Lineal<span id="badge-metro" style="display:none;background:var(--accent);color:#fff;border-radius:9px;padding:1px 6px;font-size:8px;margin-left:3px"></span>
+                <span class="stab-sub">Perfiles de aluminio por metro</span>
             </button>
             <button class="sub-tab-btn" id="stab-vcotiz" onclick="switchVentasTab('cotiz')">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -2597,8 +2603,39 @@
             </button>
         </div>
 
-        <!-- ── SUB-PANEL: METRO LINEAL (solo perfiles) ── -->
-        <div class="sub-panel active" id="spanel-metro">
+        <!-- ── SUB-PANEL: VIDRIO / ESPEJO (por m²) — PRIMER LUGAR ── -->
+        <div class="sub-panel active" id="spanel-vidrio">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <span style="font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:0.5px">SOLO VIDRIOS Y ESPEJOS</span>
+                <!-- Toggle instalación rápido -->
+                <button id="vid-install-quick-btn" onclick="toggleVidInstallQuick()"
+                    style="display:flex;align-items:center;gap:5px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:20px;padding:5px 11px;font-size:10px;font-family:var(--mono);font-weight:700;color:var(--text3);cursor:pointer;letter-spacing:0.5px;transition:all 0.15s;white-space:nowrap">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    Instalación
+                </button>
+            </div>
+            <!-- Buscador vidrio -->
+            <div class="search-bar" style="margin-bottom:4px">
+                <span class="search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></span>
+                <input type="text" id="vid-search" placeholder="Buscar vidrio o espejo..." oninput="debouncedVidSearch(this.value)" autocomplete="off">
+            </div>
+            <div id="vid-dropdown" class="dropdown-results" style="margin-bottom:10px"></div>
+            <!-- Lista de vidrios -->
+            <div id="vid-items-list">
+                <div class="ped-empty">Busca un vidrio o espejo para calcular</div>
+            </div>
+            <!-- Total general -->
+            <div class="vidcalc-grand-total" id="vid-grand-total-box">
+                <div id="vid-grand-rows"></div>
+                <div class="vidcalc-grand-final">
+                    <span>TOTAL</span>
+                    <span id="vid-grand-total-val">$0.00</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── SUB-PANEL: METRO LINEAL (solo perfiles) — SEGUNDO LUGAR ── -->
+        <div class="sub-panel" id="spanel-metro">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
                 <span style="font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:0.5px">SOLO PERFILES DE ALUMINIO</span>
                 <button onclick="pedLoadKitDropdown()" id="ped-kit-btn"
@@ -2636,37 +2673,6 @@
                 <div class="ped-total-grand">
                     <span>TOTAL</span>
                     <span id="ped-grand-total">$0.00</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- ── SUB-PANEL: VIDRIO / ESPEJO (por m²) ── -->
-        <div class="sub-panel" id="spanel-vidrio">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                <span style="font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:0.5px">SOLO VIDRIOS Y ESPEJOS</span>
-                <!-- Toggle instalación rápido -->
-                <button id="vid-install-quick-btn" onclick="toggleVidInstallQuick()"
-                    style="display:flex;align-items:center;gap:5px;background:var(--surface2);border:1.5px solid var(--border2);border-radius:20px;padding:5px 11px;font-size:10px;font-family:var(--mono);font-weight:700;color:var(--text3);cursor:pointer;letter-spacing:0.5px;transition:all 0.15s;white-space:nowrap">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                    Instalación
-                </button>
-            </div>
-            <!-- Buscador vidrio -->
-            <div class="search-bar" style="margin-bottom:4px">
-                <span class="search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></span>
-                <input type="text" id="vid-search" placeholder="Buscar vidrio o espejo..." oninput="debouncedVidSearch(this.value)" autocomplete="off">
-            </div>
-            <div id="vid-dropdown" class="dropdown-results" style="margin-bottom:10px"></div>
-            <!-- Lista de vidrios -->
-            <div id="vid-items-list">
-                <div class="ped-empty">Busca un vidrio o espejo para calcular</div>
-            </div>
-            <!-- Total general -->
-            <div class="vidcalc-grand-total" id="vid-grand-total-box">
-                <div id="vid-grand-rows"></div>
-                <div class="vidcalc-grand-final">
-                    <span>TOTAL</span>
-                    <span id="vid-grand-total-val">$0.00</span>
                 </div>
             </div>
         </div>
@@ -2931,7 +2937,7 @@
         <span class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="9" height="18" rx="1.5"/><rect x="13" y="3" width="9" height="18" rx="1.5"/></svg></span>
         Comparar
     </button>
-    <button data-tab="config" class="nav-btn" onclick="navigate('screen-config',this)">
+    <button id="nav-btn-config" data-tab="config" class="nav-btn" onclick="navigate('screen-config',this)">
         <span class="nav-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
         Config
     </button>
@@ -6207,13 +6213,40 @@ function aplicarPermisosUsuario(esAdmin) {
 function aplicarVisibilidadAdmin(esAdmin) {
     const navBtn = document.getElementById('nav-btn-admin');
     const screen = document.getElementById('screen-admin');
+    // Tab Config: solo admin lo ve
+    const navConfig = document.getElementById('nav-btn-config');
     if (esAdmin) {
         if (navBtn) navBtn.style.display = '';
         if (screen) screen.style.display = '';
+        if (navConfig) navConfig.style.display = '';
     } else {
         if (navBtn) navBtn.style.display = 'none';
         if (screen) screen.style.display = 'none';
+        if (navConfig) navConfig.style.display = 'none';
     }
+    // FABs y controles de edición de inventario: solo admin
+    const adminOnlyFABs = ['btn-save-item', 'admin-export-btn', 'admin-import-btn'];
+    adminOnlyFABs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = esAdmin ? '' : 'none';
+    });
+    // Inputs de precio distribuidor: solo lectura para usuarios comunes
+    // Convertir a texto plano si no es admin
+    document.querySelectorAll('.dist-price-row input[type="number"]').forEach(inp => {
+        if (!esAdmin) {
+            inp.readOnly = true;
+            inp.style.pointerEvents = 'none';
+            inp.style.opacity = '0.55';
+            inp.style.background = 'transparent';
+            inp.style.border = 'none';
+        } else {
+            inp.readOnly = false;
+            inp.style.pointerEvents = '';
+            inp.style.opacity = '';
+            inp.style.background = '';
+            inp.style.border = '';
+        }
+    });
 }
 
 // ─────────────────────────────────────────────
@@ -6361,7 +6394,7 @@ let _adminEventosFiltro = 'todos';
 
 // ── Sub-tab navigation ──
 function adminTab(tab) {
-    ['dashboard','usuarios','eventos','mensajes'].forEach(t => {
+    ['dashboard','usuarios','mensajes'].forEach(t => {
         const panel = document.getElementById('apanel-' + t);
         const btn   = document.getElementById('atab-' + t);
         if (panel) panel.style.display = t === tab ? '' : 'none';
@@ -6369,7 +6402,330 @@ function adminTab(tab) {
     });
     if (tab === 'dashboard') adminCargarDashboard();
     if (tab === 'usuarios')  { adminCargarOnline(); adminCargarActividad(); }
-    if (tab === 'eventos')   adminCargarEventos();
+    if (tab === 'mensajes')  adminCargarNotifsFeed();
+}
+
+// ── Mapa de etiquetas de negocio — elimina ruido técnico ──
+const ADMIN_LABEL_MAP = {
+    'busqueda':          'Búsqueda en catálogo',
+    'kit_cargado':       'Kit cargado',
+    'cotizacion':        'Cotización generada',
+    'producto_agregado': 'Producto agregado al pedido',
+    'ventas':            'Pantalla de Ventas',
+    'pedidos':           'Historial de Pedidos',
+    'comparar':          'Comparar Líneas',
+    'config':            'Ajustes del Sistema',
+    'screen-ventas':     'Pantalla de Ventas',
+    'screen-config':     'Ajustes del Sistema',
+    'screen-history':    'Historial de Pedidos',
+    'screen-budget':     'Lista de Materiales',
+    'screen-comparar':   'Comparar Líneas',
+    'screen-admin':      'Panel Administrativo',
+    'screen_history':    'Historial de Pedidos',
+    'screen_ventas':     'Pantalla de Ventas',
+    'conexion':          'Inicio de sesión',
+};
+
+function adminLabelClean(raw) {
+    if (!raw) return '—';
+    const lk = (raw + '').toLowerCase().trim();
+    if (ADMIN_LABEL_MAP[lk]) return ADMIN_LABEL_MAP[lk];
+    // Reemplazar patrones técnicos de rutas/screen
+    return (raw + '').replace(/\bscreen[-_][a-z]+\b/gi, m => ADMIN_LABEL_MAP[m.toLowerCase()] || m);
+}
+
+// ═══════════════════════════════════════════════════
+//  DRILLDOWN — lógica de tarjetas interactivas
+// ═══════════════════════════════════════════════════
+let _adminDrillActive  = null;   // 'sesiones' | 'cotizaciones' | 'busquedas' | 'usuarios'
+let _adminDrillFilter  = 'todos';
+let _adminEventosCache = [];
+let _adminEventosFiltro = 'todos';
+
+const DRILL_CONFIG = {
+    sesiones:     { title: '📅 DETALLE DE SESIONES',     color: 'var(--accent)',  tipo: null },
+    cotizaciones: { title: '💰 DETALLE DE COTIZACIONES', color: 'var(--success)', tipo: 'cotizacion' },
+    busquedas:    { title: '🔍 DETALLE DE BÚSQUEDAS',    color: 'var(--warning)', tipo: 'busqueda' },
+    usuarios:     { title: '👥 USUARIOS ÚNICOS',          color: 'var(--info)',    tipo: null },
+};
+
+function adminDrillDown(metric) {
+    _adminDrillActive = metric;
+    _adminDrillFilter = 'todos';
+    const cfg = DRILL_CONFIG[metric];
+    // Resaltar tarjeta activa
+    document.querySelectorAll('.kpi-card').forEach(c => {
+        c.style.borderColor = '';
+        c.style.boxShadow = '';
+    });
+    const activeCard = document.getElementById('kpi-card-' + metric);
+    if (activeCard) {
+        activeCard.style.borderColor = cfg.color;
+        activeCard.style.boxShadow = `0 0 0 3px ${cfg.color.replace(')', ',0.18)')}`;
+    }
+    // Mostrar panel
+    const panel = document.getElementById('admin-drilldown-panel');
+    const title = document.getElementById('admin-drilldown-title');
+    panel.style.display = '';
+    title.textContent = cfg.title;
+    // Render filtros y contenido
+    adminRenderDrillFilters(metric);
+    adminRenderDrillContent(metric, 'todos');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function adminCloseDrillDown() {
+    _adminDrillActive = null;
+    document.getElementById('admin-drilldown-panel').style.display = 'none';
+    document.querySelectorAll('.kpi-card').forEach(c => {
+        c.style.borderColor = '';
+        c.style.boxShadow = '';
+    });
+}
+
+function adminRenderDrillFilters(metric) {
+    const el = document.getElementById('admin-drilldown-filters');
+    let filters = [];
+    if (metric === 'sesiones' || metric === 'usuarios') {
+        filters = [
+            { key: 'todos', label: 'Todos' },
+            { key: 'hoy',   label: 'Hoy' },
+            { key: '7d',    label: 'Últimos 7 días' },
+            { key: 'activos', label: '🟢 En línea' },
+        ];
+    } else if (metric === 'cotizaciones') {
+        filters = [
+            { key: 'todos',   label: 'Todas' },
+            { key: 'hoy',     label: 'Hoy' },
+            { key: '7d',      label: '7 días' },
+            { key: 'usuario', label: 'Por usuario' },
+        ];
+    } else if (metric === 'busquedas') {
+        filters = [
+            { key: 'todos',    label: 'Todas' },
+            { key: 'hoy',      label: 'Hoy' },
+            { key: 'top',      label: 'Top 10' },
+            { key: 'usuario',  label: 'Por usuario' },
+            { key: 'kit',      label: 'Kit' },
+            { key: 'producto', label: 'Producto' },
+        ];
+    }
+    el.innerHTML = filters.map(f =>
+        `<button onclick="adminRenderDrillContent('${metric}','${f.key}')"
+            id="drillfil-${f.key}"
+            style="padding:5px 11px;border-radius:20px;font-size:10px;font-family:var(--mono);font-weight:700;cursor:pointer;border:1.5px solid var(--border2);background:${f.key==='todos'?'var(--accent)':'var(--surface2)'};color:${f.key==='todos'?'#fff':'var(--text2)'};letter-spacing:0.4px;transition:all 0.15s">
+            ${f.label}
+        </button>`
+    ).join('');
+}
+
+function adminRenderDrillContent(metric, filtro) {
+    _adminDrillFilter = filtro;
+    const el = document.getElementById('admin-drilldown-content');
+    // Actualizar aspecto de botones de filtro
+    document.querySelectorAll('[id^="drillfil-"]').forEach(btn => {
+        const isActive = btn.id === 'drillfil-' + filtro;
+        btn.style.background = isActive ? 'var(--accent)' : 'var(--surface2)';
+        btn.style.color = isActive ? '#fff' : 'var(--text2)';
+    });
+
+    el.innerHTML = `<div style="text-align:center;padding:16px;color:var(--text3);font-size:11px;font-family:var(--mono)">Cargando…</div>`;
+
+    const ahora = Date.now();
+    const HOY   = new Date().toISOString().substring(0, 10);
+    const HACE7 = ahora - 7 * 24 * 60 * 60 * 1000;
+
+    let datos = [..._adminEventosCache];
+
+    // --- SESIONES / USUARIOS ---
+    if (metric === 'sesiones' || metric === 'usuarios') {
+        _db.collection('sesiones').where('inicio', '>', ahora - 30 * 24 * 60 * 60 * 1000)
+            .orderBy('inicio', 'desc').limit(50).get().then(snap => {
+            let sesiones = snap.docs.map(d => d.data()).filter(d => d.email !== ADMIN_EMAIL);
+            if (filtro === 'hoy')    sesiones = sesiones.filter(s => new Date(s.inicio).toISOString().substring(0,10) === HOY);
+            if (filtro === '7d')     sesiones = sesiones.filter(s => s.inicio > HACE7);
+            if (filtro === 'activos') sesiones = sesiones.filter(s => s.activo);
+            if (metric === 'usuarios') {
+                // Agrupar por uid
+                const umap = {};
+                sesiones.forEach(s => { if (!umap[s.uid]) umap[s.uid] = { nombre: s.nombre, sesiones: 0, ultimo: s.inicio }; umap[s.uid].sesiones++; if (s.inicio > umap[s.uid].ultimo) umap[s.uid].ultimo = s.inicio; });
+                const ulist = Object.values(umap).sort((a,b) => b.ultimo - a.ultimo);
+                el.innerHTML = ulist.length ? ulist.map(u => `
+                    <div class="card" style="margin-bottom:6px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center">
+                        <div>
+                            <div style="font-weight:700;font-size:13px;color:var(--text)">${u.nombre}</div>
+                            <div style="font-size:10px;font-family:var(--mono);color:var(--text3)">${u.sesiones} sesión${u.sesiones!==1?'es':''} · último: ${new Date(u.ultimo).toLocaleDateString('es-MX')}</div>
+                        </div>
+                        <span style="font-family:var(--mono);font-size:14px;font-weight:800;color:var(--info)">${u.sesiones}x</span>
+                    </div>`).join('') :
+                    `<div style="text-align:center;color:var(--text3);font-size:11px;font-family:var(--mono);padding:16px">Sin datos para este filtro</div>`;
+                return;
+            }
+            el.innerHTML = sesiones.length ? sesiones.slice(0,20).map(s => {
+                const fecha = new Date(s.inicio).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+                const ds = s.duracionSegundos;
+                const dur = !ds ? (s.activo?'🟢 En línea':'—') : ds < 60 ? `${ds}s` : ds < 3600 ? `${Math.round(ds/60)}min` : `${Math.floor(ds/3600)}h ${Math.round((ds%3600)/60)}m`;
+                return `<div class="card" style="margin-bottom:6px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center">
+                    <div>
+                        <div style="font-weight:700;font-size:13px;color:var(--text)">${s.nombre}</div>
+                        <div style="font-size:10px;font-family:var(--mono);color:var(--text3)">${fecha}</div>
+                    </div>
+                    <span style="font-family:var(--mono);font-size:12px;color:${s.activo?'var(--success)':'var(--text3)'}">${dur}</span>
+                </div>`;
+            }).join('') : `<div style="text-align:center;color:var(--text3);font-size:11px;font-family:var(--mono);padding:16px">Sin sesiones para este filtro</div>`;
+        }).catch(() => { el.innerHTML = `<div style="color:var(--danger);font-size:11px;font-family:var(--mono);padding:12px">Error al cargar sesiones</div>`; });
+        return;
+    }
+
+    // --- COTIZACIONES ---
+    if (metric === 'cotizaciones') {
+        let lista = datos.filter(e => e.tipo === 'cotizacion');
+        if (filtro === 'hoy')    lista = lista.filter(e => new Date(e.ts).toISOString().substring(0,10) === HOY);
+        if (filtro === '7d')     lista = lista.filter(e => e.ts > HACE7);
+        if (filtro === 'usuario') {
+            // Agrupar por nombre
+            const umap = {};
+            lista.forEach(e => { const n = e.nombre||e.email||'—'; if(!umap[n]) umap[n] = { total: 0, count: 0 }; umap[n].count++; umap[n].total += e.total||0; });
+            el.innerHTML = Object.entries(umap).sort((a,b)=>b[1].count-a[1].count).map(([n,v]) =>
+                `<div class="card" style="margin-bottom:6px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center">
+                    <div style="font-weight:700;font-size:13px;color:var(--text)">${n}<br><span style="font-weight:400;font-size:10px;color:var(--text3);font-family:var(--mono)">${v.count} cotizacione${v.count!==1?'s':''}</span></div>
+                    <span style="font-family:var(--mono);font-size:13px;font-weight:800;color:var(--success)">$${v.total.toLocaleString('es-MX',{maximumFractionDigits:0})}</span>
+                </div>`).join('') || `<div style="text-align:center;color:var(--text3);font-size:11px;font-family:var(--mono);padding:16px">Sin cotizaciones</div>`;
+            return;
+        }
+        el.innerHTML = lista.slice(0,20).map(e => {
+            const fecha = new Date(e.ts).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+            return `<div class="card" style="margin-bottom:6px;padding:10px 12px">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <span style="font-weight:700;font-size:13px;color:var(--text)">${e.nombre||e.email||'—'}</span>
+                    <span style="font-family:var(--mono);font-size:12px;color:var(--success);font-weight:800">$${(e.total||0).toLocaleString('es-MX',{maximumFractionDigits:0})}</span>
+                </div>
+                <div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:3px">${fecha} · ${e.cliente||'Sin cliente'} · ${e.items||0} artículos</div>
+            </div>`;
+        }).join('') || `<div style="text-align:center;color:var(--text3);font-size:11px;font-family:var(--mono);padding:16px">Sin cotizaciones para este filtro</div>`;
+        return;
+    }
+
+    // --- BÚSQUEDAS ---
+    if (metric === 'busquedas') {
+        let lista = datos.filter(e => e.tipo === 'busqueda');
+        if (filtro === 'hoy')   lista = lista.filter(e => new Date(e.ts).toISOString().substring(0,10) === HOY);
+        if (filtro === '7d')    lista = lista.filter(e => e.ts > HACE7);
+        if (filtro === 'kit')   lista = lista.filter(e => /kit/i.test(e.detalle||''));
+        if (filtro === 'producto') lista = lista.filter(e => !/kit/i.test(e.detalle||'') && (e.detalle||'').length > 2);
+        if (filtro === 'top') {
+            const cnt = {};
+            lista.forEach(e => { const k=(e.detalle||'').toLowerCase().trim(); if(k) cnt[k]=(cnt[k]||0)+1; });
+            el.innerHTML = Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,v]) =>
+                `<div class="card" style="margin-bottom:5px;padding:8px 12px;display:flex;justify-content:space-between">
+                    <span style="font-size:13px;color:var(--text2)">"${k}"</span>
+                    <span style="font-family:var(--mono);font-size:11px;color:var(--warning);font-weight:800">${v}x</span>
+                </div>`).join('') || `<div style="text-align:center;color:var(--text3);font-size:11px;font-family:var(--mono);padding:16px">Sin búsquedas</div>`;
+            return;
+        }
+        if (filtro === 'usuario') {
+            const umap = {};
+            lista.forEach(e => { const n=e.nombre||e.email||'—'; umap[n]=(umap[n]||0)+1; });
+            el.innerHTML = Object.entries(umap).sort((a,b)=>b[1]-a[1]).map(([n,v]) =>
+                `<div class="card" style="margin-bottom:5px;padding:8px 12px;display:flex;justify-content:space-between">
+                    <span style="font-weight:700;font-size:13px;color:var(--text)">${n}</span>
+                    <span style="font-family:var(--mono);font-size:12px;color:var(--warning);font-weight:800">${v}x</span>
+                </div>`).join('') || `<div style="text-align:center;color:var(--text3);font-size:11px;font-family:var(--mono);padding:16px">Sin datos</div>`;
+            return;
+        }
+        el.innerHTML = lista.slice(0,20).map(e => {
+            const fecha = new Date(e.ts).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+            return `<div class="card" style="margin-bottom:5px;padding:8px 12px">
+                <div style="font-size:13px;color:var(--text2)">"${e.detalle||'—'}"</div>
+                <div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">${e.nombre||e.email||'—'} · ${fecha}</div>
+            </div>`;
+        }).join('') || `<div style="text-align:center;color:var(--text3);font-size:11px;font-family:var(--mono);padding:16px">Sin búsquedas para este filtro</div>`;
+    }
+}
+
+// ═══════════════════════════════════════════════════
+//  NOTIFICACIONES PERSISTENTES CON ESTADO LEÍDA
+// ═══════════════════════════════════════════════════
+async function adminCargarNotifsFeed() {
+    if (!_fbIsAdmin) return;
+    const el = document.getElementById('admin-notifs-feed');
+    if (!el) return;
+    el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando...</div>`;
+    try {
+        // Solo mostrar las NO leídas primero, luego las recientes leídas
+        const snapNoLeidas = await _db.collection('notificaciones_admin')
+            .where('leida', '==', false)
+            .orderBy('timestamp', 'desc').limit(30).get();
+        const snapLeidas = await _db.collection('notificaciones_admin')
+            .where('leida', '==', true)
+            .orderBy('timestamp', 'desc').limit(10).get();
+
+        const noLeidas = snapNoLeidas.docs.map(d => ({ id: d.id, ...d.data(), _leida: false }));
+        const leidas   = snapLeidas.docs.map(d => ({ id: d.id, ...d.data(), _leida: true }));
+        const todas = [...noLeidas, ...leidas];
+
+        if (!todas.length) {
+            el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:24px">✓ Sin notificaciones pendientes</div>`;
+            return;
+        }
+        el.innerHTML = todas.map(n => {
+            const fecha = new Date(n.timestamp).toLocaleString('es-MX', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+            const esNueva = !n._leida;
+            return `<div class="card" style="margin-bottom:6px;padding:10px 12px;border-left:3px solid ${esNueva ? 'var(--accent)' : 'var(--border2)'};opacity:${esNueva ? '1' : '0.55'}">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+                    <div style="flex:1">
+                        <div style="font-weight:${esNueva ? '700' : '500'};font-size:13px;color:var(--text)">${n.nombre||'Usuario'}</div>
+                        <div style="font-size:12px;color:var(--text2);margin-top:2px">${adminLabelClean(n.mensaje||n.tipo)}</div>
+                        <div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:3px">${fecha}</div>
+                    </div>
+                    ${esNueva ? `<button onclick="adminMarcarLeida('${n.id}')" style="background:none;border:1px solid var(--border2);border-radius:var(--radius-xs);padding:3px 8px;font-size:9px;font-family:var(--mono);color:var(--text3);cursor:pointer;white-space:nowrap;flex-shrink:0">✓ leída</button>` : '<span style="font-size:9px;font-family:var(--mono);color:var(--text3)">leída</span>'}
+                </div>
+            </div>`;
+        }).join('');
+    } catch(e) {
+        el.innerHTML = `<div class="card" style="color:var(--danger);font-size:12px;font-family:var(--mono);padding:14px">Error: ${e.message}</div>`;
+    }
+}
+
+async function adminMarcarLeida(docId) {
+    try {
+        await _db.collection('notificaciones_admin').doc(docId).update({ leida: true });
+        adminCargarNotifsFeed();
+        // Reconteo del badge
+        const snap = await _db.collection('notificaciones_admin').where('leida','==',false).get();
+        const badge = document.getElementById('admin-badge');
+        if (badge) {
+            if (snap.size > 0) { badge.style.display = 'flex'; badge.textContent = snap.size; }
+            else badge.style.display = 'none';
+        }
+    } catch(e) { showToast('Error: ' + e.message, 'info'); }
+}
+
+async function adminMarcarTodasLeidas() {
+    if (!_fbIsAdmin) return;
+    try {
+        const snap = await _db.collection('notificaciones_admin').where('leida','==',false).get();
+        if (snap.empty) { showToast('No hay notificaciones pendientes', 'info'); return; }
+        const batch = _db.batch();
+        snap.docs.forEach(d => batch.update(d.ref, { leida: true }));
+        await batch.commit();
+        const badge = document.getElementById('admin-badge');
+        if (badge) badge.style.display = 'none';
+        showToast('✓ Todas marcadas como leídas', 'success');
+        adminCargarNotifsFeed();
+    } catch(e) { showToast('Error: ' + e.message, 'info'); }
+}
+
+// Alias de compatibilidad (llamado desde el botón antiguo en mensajes)
+async function adminLimpiarNotifs() { return adminMarcarTodasLeidas(); }
+
+// ── Funciones de filtro de eventos (compatibilidad con pie chart clickthrough) ──
+function adminFiltrarEventos(tipo) {
+    _adminEventosFiltro = tipo;
+    // Si estamos en dashboard, abrir drilldown con ese tipo
+    const map = { 'cotizacion': 'cotizaciones', 'busqueda': 'busquedas', 'kit_cargado': 'busquedas', 'producto_agregado': 'busquedas' };
+    const metric = map[tipo] || 'sesiones';
+    adminDrillDown(metric);
 }
 
 // ── Dashboard principal ──
@@ -6384,6 +6740,7 @@ async function adminCargarDashboard() {
             .limit(500)
             .get();
         const eventos = snap.docs.map(d => d.data());
+        _adminEventosCache = eventos; // cache para drilldown interactivo
 
         // KPIs
         const sesionesSnap = await _db.collection('sesiones')
@@ -7002,7 +7359,7 @@ init();
     <div style="position:sticky;top:0;z-index:50;background:var(--glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border-bottom:1px solid var(--border)">
         <div class="container" style="padding-top:10px;padding-bottom:0">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                <span class="screen-title" style="font-size:16px">Panel Admin</span>
+                <span class="screen-title" style="font-size:16px">Centro de Control</span>
                 <span id="admin-online-dot" style="display:flex;align-items:center;gap:5px;font-size:10px;font-family:var(--mono);color:var(--success)">
                     <span style="width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block;animation:pulse 2s infinite"></span>EN VIVO
                 </span>
@@ -7010,22 +7367,52 @@ init();
             <div style="display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;padding-bottom:10px">
                 <button onclick="adminTab('dashboard')" id="atab-dashboard" class="sub-tab-btn active" style="white-space:nowrap;font-size:11px">📊 Dashboard</button>
                 <button onclick="adminTab('usuarios')" id="atab-usuarios" class="sub-tab-btn" style="white-space:nowrap;font-size:11px">👥 Usuarios</button>
-                <button onclick="adminTab('eventos')" id="atab-eventos" class="sub-tab-btn" style="white-space:nowrap;font-size:11px">📋 Eventos</button>
                 <button onclick="adminTab('mensajes')" id="atab-mensajes" class="sub-tab-btn" style="white-space:nowrap;font-size:11px">📢 Mensajes</button>
             </div>
         </div>
     </div>
 
-    <!-- PANEL: DASHBOARD -->
+    <!-- PANEL: DASHBOARD — 4 tarjetas + detalle dinámico -->
     <div id="apanel-dashboard" class="container" style="padding-top:12px">
-        <!-- KPIs -->
-        <div id="admin-kpis" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
-            <div class="card" style="padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--accent)" id="kpi-sesiones">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">SESIONES 30d</div></div>
-            <div class="card" style="padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--success)" id="kpi-cotizaciones">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">COTIZACIONES</div></div>
-            <div class="card" style="padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--warning)" id="kpi-busquedas">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">BÚSQUEDAS</div></div>
-            <div class="card" style="padding:12px;text-align:center"><div style="font-size:22px;font-weight:800;color:var(--info)" id="kpi-usuarios">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">USUARIOS ÚNICOS</div></div>
+
+        <!-- CUADRÍCULA DE 4 MÉTRICAS INTERACTIVAS -->
+        <div id="admin-kpis" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+            <div class="kpi-card" id="kpi-card-sesiones" onclick="adminDrillDown('sesiones')" style="cursor:pointer;padding:14px 12px;text-align:center;border-radius:var(--radius-md);background:var(--surface);border:1.5px solid var(--border2);box-shadow:var(--shadow);transition:border-color 0.18s,box-shadow 0.18s;user-select:none">
+                <div style="font-size:28px;font-weight:800;color:var(--accent);font-family:var(--mono)" id="kpi-sesiones">—</div>
+                <div style="font-size:9px;font-family:var(--mono);color:var(--text3);margin-top:3px;letter-spacing:1px">SESIONES · 30d</div>
+                <div style="font-size:9px;color:var(--accent);margin-top:4px;opacity:0.75">ver detalle →</div>
+            </div>
+            <div class="kpi-card" id="kpi-card-cotizaciones" onclick="adminDrillDown('cotizaciones')" style="cursor:pointer;padding:14px 12px;text-align:center;border-radius:var(--radius-md);background:var(--surface);border:1.5px solid var(--border2);box-shadow:var(--shadow);transition:border-color 0.18s,box-shadow 0.18s;user-select:none">
+                <div style="font-size:28px;font-weight:800;color:var(--success);font-family:var(--mono)" id="kpi-cotizaciones">—</div>
+                <div style="font-size:9px;font-family:var(--mono);color:var(--text3);margin-top:3px;letter-spacing:1px">COTIZACIONES</div>
+                <div style="font-size:9px;color:var(--success);margin-top:4px;opacity:0.75">ver detalle →</div>
+            </div>
+            <div class="kpi-card" id="kpi-card-busquedas" onclick="adminDrillDown('busquedas')" style="cursor:pointer;padding:14px 12px;text-align:center;border-radius:var(--radius-md);background:var(--surface);border:1.5px solid var(--border2);box-shadow:var(--shadow);transition:border-color 0.18s,box-shadow 0.18s;user-select:none">
+                <div style="font-size:28px;font-weight:800;color:var(--warning);font-family:var(--mono)" id="kpi-busquedas">—</div>
+                <div style="font-size:9px;font-family:var(--mono);color:var(--text3);margin-top:3px;letter-spacing:1px">BÚSQUEDAS</div>
+                <div style="font-size:9px;color:var(--warning);margin-top:4px;opacity:0.75">ver detalle →</div>
+            </div>
+            <div class="kpi-card" id="kpi-card-usuarios" onclick="adminDrillDown('usuarios')" style="cursor:pointer;padding:14px 12px;text-align:center;border-radius:var(--radius-md);background:var(--surface);border:1.5px solid var(--border2);box-shadow:var(--shadow);transition:border-color 0.18s,box-shadow 0.18s;user-select:none">
+                <div style="font-size:28px;font-weight:800;color:var(--info);font-family:var(--mono)" id="kpi-usuarios">—</div>
+                <div style="font-size:9px;font-family:var(--mono);color:var(--text3);margin-top:3px;letter-spacing:1px">USUARIOS ÚNICOS</div>
+                <div style="font-size:9px;color:var(--info);margin-top:4px;opacity:0.75">ver detalle →</div>
+            </div>
         </div>
-        <!-- Actividad por día -->
+
+        <!-- PANEL DE DETALLE DINÁMICO (se activa al hacer clic en una tarjeta) -->
+        <div id="admin-drilldown-panel" style="display:none;margin-bottom:14px;animation:screenIn 0.22s ease both">
+            <!-- Encabezado del detalle -->
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                <span id="admin-drilldown-title" style="font-size:13px;font-weight:700;color:var(--text);font-family:var(--mono);letter-spacing:0.5px"></span>
+                <button onclick="adminCloseDrillDown()" style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-xs);padding:4px 10px;font-size:10px;font-family:var(--mono);color:var(--text3);cursor:pointer">✕ CERRAR</button>
+            </div>
+            <!-- Barra de filtros unificados -->
+            <div id="admin-drilldown-filters" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
+            <!-- Contenido del detalle -->
+            <div id="admin-drilldown-content"></div>
+        </div>
+
+        <!-- GRÁFICA CIRCULAR POR FUNCIÓN -->
         <div class="section-divider-label">ACTIVIDAD POR FUNCIÓN (30d)</div>
         <div class="card" style="padding:16px;margin-bottom:12px">
             <div style="display:flex;align-items:center;gap:16px">
@@ -7034,17 +7421,17 @@ init();
             </div>
             <div id="admin-pie-empty" style="display:none;text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:16px 0">Sin datos aún</div>
         </div>
-        <!-- Top eventos -->
-        <div class="section-divider-label">FUNCIONES MÁS USADAS (30d)</div>
-        <div id="admin-stats-chart" class="card" style="padding:14px;margin-bottom:12px;min-height:60px">
-            <div style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:12px 0">Cargando...</div>
-        </div>
-        <!-- Top búsquedas -->
+
+        <!-- TOP BÚSQUEDAS -->
         <div class="section-divider-label">BÚSQUEDAS MÁS FRECUENTES</div>
         <div id="admin-top-busquedas" class="card" style="padding:14px;margin-bottom:12px;min-height:40px"></div>
-        <!-- Top productos -->
+
+        <!-- TOP PRODUCTOS -->
         <div class="section-divider-label">PRODUCTOS MÁS AGREGADOS</div>
         <div id="admin-top-productos" class="card" style="padding:14px;margin-bottom:80px;min-height:40px"></div>
+
+        <!-- Compatibilidad: elemento oculto que evita errores en adminRenderStatsChart -->
+        <div id="admin-stats-chart" style="display:none"></div>
     </div>
 
     <!-- PANEL: USUARIOS -->
@@ -7059,21 +7446,7 @@ init();
         </div>
     </div>
 
-    <!-- PANEL: EVENTOS -->
-    <div id="apanel-eventos" class="container" style="padding-top:12px;display:none">
-        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-            <button onclick="adminFiltrarEventos('todos')" id="efil-todos" class="sub-tab-btn active" style="font-size:10px">Todos</button>
-            <button onclick="adminFiltrarEventos('cotizacion')" id="efil-cotizacion" class="sub-tab-btn" style="font-size:10px">💰 Cotizaciones</button>
-            <button onclick="adminFiltrarEventos('busqueda')" id="efil-busqueda" class="sub-tab-btn" style="font-size:10px">🔍 Búsquedas</button>
-            <button onclick="adminFiltrarEventos('kit_cargado')" id="efil-kit" class="sub-tab-btn" style="font-size:10px">📦 Kits</button>
-            <button onclick="adminFiltrarEventos('producto_agregado')" id="efil-producto" class="sub-tab-btn" style="font-size:10px">➕ Productos</button>
-        </div>
-        <div id="admin-eventos-list" style="min-height:60px;margin-bottom:80px">
-            <div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando...</div>
-        </div>
-    </div>
-
-    <!-- PANEL: MENSAJES -->
+    <!-- PANEL: MENSAJES + NOTIFICACIONES -->
     <div id="apanel-mensajes" class="container" style="padding-top:12px;display:none">
         <div class="card" style="margin-bottom:12px">
             <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;margin-bottom:8px">📢 ENVIAR MENSAJE A TODOS</div>
@@ -7084,11 +7457,14 @@ init();
                 📤 ENVIAR NOTIFICACIÓN A TODOS
             </button>
         </div>
-        <div class="section-divider-label">NOTIFICACIONES</div>
-        <div class="card" style="padding:12px;margin-bottom:80px">
-            <button onclick="adminLimpiarNotifs()" class="btn-main ghost-btn" style="margin:0;font-size:12px;color:var(--danger);border-color:var(--danger)">
-                🗑 MARCAR TODAS COMO LEÍDAS
-            </button>
+
+        <!-- NOTIFICACIONES PERSISTENTES CON ESTADO LEÍDA/NO LEÍDA -->
+        <div class="section-divider-label" style="display:flex;justify-content:space-between;align-items:center">
+            <span>NOTIFICACIONES</span>
+            <button onclick="adminMarcarTodasLeidas()" style="background:none;border:none;font-size:10px;font-family:var(--mono);color:var(--danger);cursor:pointer;letter-spacing:0.5px;padding:0">✓ MARCAR TODO LEÍDO</button>
+        </div>
+        <div id="admin-notifs-feed" style="min-height:60px;margin-bottom:80px">
+            <div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando notificaciones...</div>
         </div>
     </div>
 </div>
