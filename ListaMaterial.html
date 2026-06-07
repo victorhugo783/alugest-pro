@@ -5830,7 +5830,7 @@ function saveVentaCotizacion() {
     }
 
     const totalGeneral = totalPerfiles + totalVidrios;
-    trackEvento('cotizacion', { cliente: cliente||'PÚBLICO EN GENERAL', total: totalGeneral, tipo: includePerfiles && includeVidrios ? 'perfiles+vidrio' : includePerfiles ? 'perfiles' : 'vidrio', items: pedSnap.length + vidSnap.length });
+    trackEvento('cotizacion', { cliente: cliente||'PÚBLICO EN GENERAL', total: totalGeneral, tipo: includePerfiles && includeVidrios ? 'perfiles+vidrio' : includePerfiles ? 'perfiles' : 'vidrio', items: pedSnap.length + vidSnap.length, perfiles: pedSnap, vidrios: vidSnap });
     const folio = getVentaFolio();
     if (!data.ventaHistory) data.ventaHistory = [];
     data.ventaHistory.unshift({
@@ -6466,6 +6466,7 @@ function escucharBroadcasts(user) {
 
 let _adminEventosCache = [];
 let _adminEventosFiltro = 'todos';
+let _adminEventosUsuario = ''; // '' = todos los usuarios
 
 // ── Sub-tab navigation ──
 function adminTab(tab) {
@@ -6483,7 +6484,7 @@ function adminTab(tab) {
     if (titleEl) titleEl.textContent = titles[tab] || 'Panel Admin';
     if (tab === 'dashboard') adminCargarDashboard();
     if (tab === 'usuarios')  { adminCargarOnline(); adminCargarActividad(); }
-    if (tab === 'eventos')   { _adminEventosCache = []; _adminEventosFiltro = ''; adminCargarEventos(); }
+    if (tab === 'eventos')   { _adminEventosCache = []; _adminEventosFiltro = 'todos'; _adminEventosUsuario = ''; adminCargarEventos(); }
     if (tab === 'mensajes')  {} // sin carga especial
 }
 
@@ -6508,6 +6509,7 @@ async function adminVerDetalle(tipo) {
     if (backBtn) backBtn.style.display = '';
     if (titleEl) titleEl.textContent = 'Eventos';
     // Cargar datos y aplicar filtro
+    _adminEventosUsuario = '';
     await adminCargarEventos();
     adminFiltrarEventos(filtro);
 }
@@ -6716,6 +6718,7 @@ async function adminCargarEventos() {
         if (!_adminEventosFiltro) {
             el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Selecciona un filtro para ver eventos</div>`;
         } else {
+            adminRenderUsuariosChips();
             adminRenderEventosFiltrados();
         }
     } catch(e) {
@@ -6725,11 +6728,13 @@ async function adminCargarEventos() {
 
 function adminFiltrarEventos(tipo) {
     _adminEventosFiltro = tipo;
+    _adminEventosUsuario = ''; // reset usuario al cambiar tipo
     ['todos','sesiones','cotizacion','busqueda','kit_cargado','producto_agregado'].forEach(t => {
         const id = t === 'kit_cargado' ? 'efil-kit' : t === 'producto_agregado' ? 'efil-producto' : 'efil-' + t;
         const btn = document.getElementById(id);
         if (btn) btn.classList.toggle('active', t === tipo);
     });
+    adminRenderUsuariosChips();
     adminRenderEventosFiltrados();
 }
 
@@ -6740,13 +6745,49 @@ function adminLimpiarVistaEventos() {
     const search = document.getElementById('admin-eventos-search');
     if (search) search.value = '';
     if (counter) counter.textContent = '';
-    if (el) el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Selecciona un filtro para ver eventos</div>`;
-    // Desactivar todos los filtros visualmente
+    // Resetear a "todos" en vez de vaciar
+    _adminEventosFiltro = 'todos';
+    _adminEventosUsuario = '';
     ['todos','sesiones','cotizacion','busqueda','efil-kit','efil-producto'].forEach(id => {
         const btn = document.getElementById(id.startsWith('efil-') ? id : 'efil-' + id);
-        if (btn) btn.classList.remove('active');
+        if (btn) btn.classList.toggle('active', id === 'todos');
     });
-    _adminEventosFiltro = '';
+    adminRenderUsuariosChips();
+    adminRenderEventosFiltrados();
+}
+
+// ── Chips de usuarios para filtrar ──
+function adminRenderUsuariosChips() {
+    const el = document.getElementById('admin-eventos-usuarios');
+    if (!el) return;
+
+    // Extraer usuarios únicos del cache según filtro activo
+    let fuente = _adminEventosCache;
+    if (_adminEventosFiltro && _adminEventosFiltro !== 'todos' && _adminEventosFiltro !== 'sesiones') {
+        fuente = _adminEventosCache.filter(e => e.tipo === _adminEventosFiltro);
+    }
+    const usuarios = [...new Map(fuente.map(e => [e.uid, { uid: e.uid, nombre: e.nombre || e.email || '?' }])).values()]
+        .filter(u => u.uid);
+
+    if (!usuarios.length) { el.innerHTML = ''; return; }
+
+    el.innerHTML = `
+        <button onclick="adminFiltrarUsuario('')" class="sub-tab-btn ${!_adminEventosUsuario ? 'active' : ''}" style="font-size:10px;padding:4px 10px">Todos</button>
+        ${usuarios.map(u => `<button onclick="adminFiltrarUsuario('${u.uid}')" class="sub-tab-btn ${_adminEventosUsuario === u.uid ? 'active' : ''}" style="font-size:10px;padding:4px 10px">${u.nombre}</button>`).join('')}
+    `;
+}
+
+function adminFiltrarUsuario(uid) {
+    _adminEventosUsuario = uid;
+    adminRenderUsuariosChips();
+    adminRenderEventosFiltrados();
+}
+
+// ── Expandir/colapsar detalle de un evento ──
+function adminToggleDetalle(id) {
+    const el = document.getElementById('evdet-' + id);
+    if (!el) return;
+    el.style.display = el.style.display === 'none' ? '' : 'none';
 }
 
 function adminRenderEventosFiltrados() {
@@ -6806,6 +6847,11 @@ function adminRenderEventosFiltrados() {
         ? _adminEventosCache.filter(e => ['busqueda','kit_cargado','cotizacion','producto_agregado'].includes(e.tipo))
         : _adminEventosCache.filter(e => e.tipo === _adminEventosFiltro);
 
+    // Aplicar filtro de usuario
+    if (_adminEventosUsuario) {
+        lista = lista.filter(e => e.uid === _adminEventosUsuario);
+    }
+
     // Aplicar filtro de texto sobre nombre, email, detalle, cliente
     if (textoBusq) {
         lista = lista.filter(e =>
@@ -6816,6 +6862,19 @@ function adminRenderEventosFiltrados() {
         );
     }
 
+    // En modo "todos" o "busqueda": ocultar búsquedas sin selección (poco informativas)
+    // a menos que se haya pedido específicamente con el filtro texto
+    const ocultarSinSel = !textoBusq && (_adminEventosFiltro === 'todos');
+    if (ocultarSinSel) {
+        lista = lista.filter(e => {
+            if (e.tipo !== 'busqueda') return true;
+            const productoSig = _adminEventosCache.find(x =>
+                x.tipo === 'producto_agregado' && x.uid === e.uid && x.ts > e.ts && x.ts - e.ts < 60000
+            );
+            return !!productoSig; // solo mostrar búsquedas que sí terminaron en selección
+        });
+    }
+
     if (counter) counter.textContent = lista.length ? `${lista.length} EVENTO${lista.length!==1?'S':''}` : '';
 
     if (!lista.length) {
@@ -6823,13 +6882,38 @@ function adminRenderEventosFiltrados() {
         return;
     }
 
-    el.innerHTML = lista.slice(0,60).map(e => {
+    el.innerHTML = lista.slice(0,60).map((e, idx) => {
         const hora = new Date(e.ts).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+        const evId = e.uid + '_' + e.ts + '_' + idx;
         let detalle = '';
         let subDetalle = '';
+        let expandible = '';
 
         if (e.tipo === 'cotizacion') {
-            detalle = `<span style="color:var(--success);font-weight:700">$${(e.total||0).toLocaleString('es-MX',{maximumFractionDigits:0})}</span> · ${e.cliente||'—'} · ${e.items||0} artículos`;
+            detalle = `<span style="color:var(--success);font-weight:700">$${(e.total||0).toLocaleString('es-MX',{maximumFractionDigits:0})}</span> · ${e.cliente||'—'} · ${e.items||0} artículo${(e.items||0)!==1?'s':''}`;
+
+            // Desglose expandible si hay datos de artículos
+            const perfiles = e.perfiles || [];
+            const vidrios  = e.vidrios  || [];
+            if (perfiles.length || vidrios.length) {
+                const filasPerfil = perfiles.map(p =>
+                    `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border)">
+                        <span style="font-size:10px;color:var(--text2)">${p.nombre||''}${p.color?' <span style="color:var(--text3)">'+p.color+'</span>':''}</span>
+                        <span style="font-family:var(--mono);font-size:10px;color:var(--text)">$${(p.subtotal||0).toLocaleString('es-MX',{maximumFractionDigits:0})} · ${p.metros}m</span>
+                    </div>`
+                ).join('');
+                const filasVidrio = vidrios.map(v =>
+                    `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border)">
+                        <span style="font-size:10px;color:var(--text2)">${v.nombre||''}${v.color?' <span style="color:var(--text3)">'+v.color+'</span>':''} · ${v.ancho}×${v.alto}</span>
+                        <span style="font-family:var(--mono);font-size:10px;color:var(--text)">$${(v.precioFinal||0).toLocaleString('es-MX',{maximumFractionDigits:0})} · ${v.m2?.toFixed(2)||'?'}m²</span>
+                    </div>`
+                ).join('');
+                expandible = `<div id="evdet-${evId}" style="display:none;margin-top:8px;border-top:1px solid var(--border);padding-top:6px">
+                    ${perfiles.length ? `<div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:.5px;margin-bottom:4px">PERFILES</div>${filasPerfil}` : ''}
+                    ${vidrios.length  ? `<div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:.5px;margin:6px 0 4px">VIDRIOS</div>${filasVidrio}` : ''}
+                </div>`;
+                subDetalle = `<div style="margin-top:4px"><button onclick="adminToggleDetalle('${evId}')" style="font-size:9px;font-family:var(--mono);color:var(--accent);background:none;border:none;cursor:pointer;padding:0;letter-spacing:.5px">▶ VER ARTÍCULOS</button></div>`;
+            }
         } else if (e.tipo === 'busqueda') {
             // Buscar el producto_agregado más cercano (mismo uid, ts posterior, max 60s)
             const productoSig = _adminEventosCache.find(x =>
@@ -6858,6 +6942,7 @@ function adminRenderEventosFiltrados() {
             </div>
             <div style="font-size:11px;color:var(--text2)">${detalle}</div>
             ${subDetalle}
+            ${expandible}
         </div>`;
     }).join('');
 }
@@ -7372,6 +7457,8 @@ init();
             <button onclick="adminFiltrarEventos('kit_cargado')" id="efil-kit" class="sub-tab-btn" style="font-size:10px">📦 Kits</button>
             <button onclick="adminFiltrarEventos('producto_agregado')" id="efil-producto" class="sub-tab-btn" style="font-size:10px">➕ Productos</button>
         </div>
+        <!-- Chips de usuario -->
+        <div id="admin-eventos-usuarios" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap"></div>
         <!-- Búsqueda + controles -->
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
             <div style="flex:1;position:relative">
