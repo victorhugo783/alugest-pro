@@ -3072,6 +3072,12 @@ async function _flushPendingSync() {
     const user = _auth.currentUser;
     if (!user) return; // No hay sesión activa, esperar
 
+    // ── PROTECCIÓN CONTRA CIERRE PREMATURO ─────────────────────────────────
+    // Antes del flush, asegurar que localStorage refleje el estado actual de
+    // data (incluyendo pedidos recientes) para que, si la app se cierra
+    // durante la sincronización, los datos no se pierdan en el próximo arranque.
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) {}
+
     const failed = [];
     for (const entry of queue) {
         try {
@@ -3101,7 +3107,10 @@ window.addEventListener('online', () => {
 });
 
 function save() {
-    // Guardar local siempre (respaldo offline)
+    // ── LOCAL SIEMPRE PRIMERO ───────────────────────────────────────────────
+    // localStorage se escribe antes de intentar cualquier cosa en Firestore.
+    // Así, aunque la app se cierre en el instante posterior, los datos ya
+    // están persistidos localmente y serán recuperados en el próximo arranque.
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     _priceEditorCache = { key: null, results: [] };
     const user = _auth.currentUser;
@@ -7134,9 +7143,41 @@ async function fbLoadHistorial(uid) {
         const doc = await _db.collection('usuarios').doc(uid).get();
         if (doc.exists) {
             const d = doc.data();
-            if (d.history)         data.history         = d.history;
-            if (d.ventaHistory)    data.ventaHistory     = d.ventaHistory;
-            if (d.lastBackupCount) data.lastBackupCount  = d.lastBackupCount;
+
+            // ── MERGE INTELIGENTE ──────────────────────────────────────────
+            // Problema anterior: si Firestore devolvía un historial más viejo
+            // (escritura fallida previa), sobreescribía localStorage y se
+            // perdían los pedidos recientes guardados solo en local.
+            // Solución: combinar ambas fuentes, desduplicar por id y quedarse
+            // con el pedido más reciente cuando hay conflicto de id.
+
+            if (d.history) {
+                const localHistory  = data.history || [];        // viene de localStorage vía init()
+                const remoteHistory = d.history;
+                // Construir un Map id→pedido; remoto primero, luego local sobreescribe
+                // si el local tiene el mismo id (más fresco que el remoto).
+                const merged = new Map();
+                remoteHistory.forEach(h => merged.set(h.id, h));
+                localHistory.forEach(h  => merged.set(h.id, h)); // local gana en conflicto
+                // Ordenar desc por folio (o id numérico) para mantener el orden esperado
+                data.history = Array.from(merged.values())
+                    .sort((a, b) => (b.folio || b.id || 0) - (a.folio || a.id || 0));
+            }
+
+            if (d.ventaHistory) {
+                const localVH  = data.ventaHistory || [];
+                const remoteVH = d.ventaHistory;
+                const mergedVH = new Map();
+                remoteVH.forEach(h => mergedVH.set(h.id, h));
+                localVH.forEach(h  => mergedVH.set(h.id, h));
+                data.ventaHistory = Array.from(mergedVH.values())
+                    .sort((a, b) => (b.id || 0) - (a.id || 0));
+            }
+
+            // lastBackupCount: tomar el mayor entre ambas fuentes
+            if (d.lastBackupCount) {
+                data.lastBackupCount = Math.max(data.lastBackupCount || 0, d.lastBackupCount);
+            }
         }
     } catch (e) { console.warn('Sin conexión, usando historial local'); }
 }
