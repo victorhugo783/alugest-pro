@@ -3750,6 +3750,7 @@ function saveAndShow() { vibrate(30);
         folio = getNextFolio();
         finalId = Date.now();
         data.history.unshift({ id: finalId, client: clientInput, date: dateStr, folio, cart: mergedCart, itemsSnapshot, insumosSnapshot: mergedInsumos, sections: hasSections ? sections.map(s=>({name:s.name})) : undefined });
+        trackEvento('pedido_guardado', { cliente: clientInput || 'SIN CLIENTE', folio, items: itemsSnapshot.length });
         showToast(`✓ TICKET #${folio} GENERADO`, 'success');
     }
     const btn = document.getElementById('btn-generar');
@@ -6709,6 +6710,8 @@ async function adminCargarEventos() {
     const el = document.getElementById('admin-eventos-list');
     if (!el) return;
     el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando...</div>`;
+    // Siempre cargar el selector de usuarios (independiente del filtro)
+    adminCargarSelectorUsuario();
     try {
         if (!_adminEventosCache.length) {
             const hace30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
@@ -6716,12 +6719,7 @@ async function adminCargarEventos() {
                 .where('ts', '>', hace30).orderBy('ts','desc').limit(300).get();
             _adminEventosCache = snap.docs.map(d => d.data());
         }
-        if (!_adminEventosFiltro) {
-            el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Selecciona un filtro para ver eventos</div>`;
-        } else {
-            adminCargarSelectorUsuario();
-            adminRenderEventosFiltrados();
-        }
+        adminRenderEventosFiltrados();
     } catch(e) {
         el.innerHTML = `<div class="card" style="color:var(--danger);font-size:12px;padding:14px">Error: ${e.message}</div>`;
     }
@@ -6732,8 +6730,8 @@ function adminFiltrarEventos(tipo) {
     _adminEventosUsuario = ''; // reset usuario al cambiar tipo
     const sel = document.getElementById('admin-eventos-usuario-sel');
     if (sel) sel.value = '';
-    ['todos','sesiones','cotizacion','busqueda','kit_cargado','producto_agregado'].forEach(t => {
-        const id = t === 'kit_cargado' ? 'efil-kit' : t === 'producto_agregado' ? 'efil-producto' : 'efil-' + t;
+    ['todos','sesiones','cotizacion','busqueda','kit_cargado','producto_agregado','pedido_guardado'].forEach(t => {
+        const id = t === 'kit_cargado' ? 'efil-kit' : t === 'producto_agregado' ? 'efil-producto' : t === 'pedido_guardado' ? 'efil-pedido' : 'efil-' + t;
         const btn = document.getElementById(id);
         if (btn) btn.classList.toggle('active', t === tipo);
     });
@@ -6808,10 +6806,10 @@ function adminRenderEventosFiltrados() {
     const counter = document.getElementById('admin-eventos-counter');
     if (!el) return;
 
-    // Si no hay filtro activo (vista limpia), no renderizar nada
-    if (!_adminEventosFiltro) return;
+    // Si no hay filtro activo, usar 'todos' por defecto
+    if (!_adminEventosFiltro) _adminEventosFiltro = 'todos';
 
-    const labels = { 'busqueda':'🔍','kit_cargado':'📦','cotizacion':'💰','ventas':'🛒','pedidos':'📋','comparar':'⚖️','config':'⚙️','producto_agregado':'➕','vidrio':'🪟' };
+    const labels = { 'busqueda':'🔍','kit_cargado':'📦','cotizacion':'💰','ventas':'🛒','pedidos':'📋','comparar':'⚖️','config':'⚙️','producto_agregado':'➕','vidrio':'🪟','pedido_guardado':'🧾' };
 
     // Texto del filtro de búsqueda
     const textoBusq = (document.getElementById('admin-eventos-search')?.value || '').toLowerCase().trim();
@@ -6857,7 +6855,7 @@ function adminRenderEventosFiltrados() {
 
     // ── Filtros normales desde eventos_global ──
     let lista = _adminEventosFiltro === 'todos'
-        ? _adminEventosCache.filter(e => ['busqueda','kit_cargado','cotizacion','producto_agregado'].includes(e.tipo))
+        ? _adminEventosCache.filter(e => ['busqueda','kit_cargado','cotizacion','producto_agregado','pedido_guardado'].includes(e.tipo))
         : _adminEventosCache.filter(e => e.tipo === _adminEventosFiltro);
 
     // Aplicar filtro de usuario
@@ -6938,7 +6936,25 @@ function adminRenderEventosFiltrados() {
             } else {
                 detalle = `"${e.detalle||''}" <span style="color:var(--text3);font-size:10px">(sin selección)</span>`;
             }
-        } else if (e.tipo === 'kit_cargado') {
+        } else if (e.tipo === 'pedido_guardado') {
+            detalle = `🧾 Ticket #${e.folio||'—'} · ${e.cliente||'—'} · ${e.items||0} artículo${(e.items||0)!==1?'s':''}`;
+            // Buscar los producto_agregado del mismo usuario en los 10 min previos al pedido
+            const artsPedido = _adminEventosCache.filter(x =>
+                x.tipo === 'producto_agregado' && x.uid === e.uid &&
+                x.ts <= e.ts && e.ts - x.ts < 10 * 60 * 1000
+            );
+            if (artsPedido.length) {
+                const filasArts = artsPedido.map(p =>
+                    `<div style="padding:2px 0;border-bottom:1px solid var(--border);font-size:10px;color:var(--text2)">
+                        ${p.nombre||''}${p.color?' · <span style="color:var(--text3)">'+p.color+'</span>':''}
+                    </div>`
+                ).join('');
+                expandible = `<div id="evdet-${evId}" style="display:none;margin-top:8px;border-top:1px solid var(--border);padding-top:6px">
+                    <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:.5px;margin-bottom:4px">MATERIALES AGREGADOS (${artsPedido.length})</div>
+                    ${filasArts}
+                </div>`;
+                subDetalle = `<div style="margin-top:4px"><button onclick="adminToggleDetalle('${evId}')" style="font-size:9px;font-family:var(--mono);color:var(--accent);background:none;border:none;cursor:pointer;padding:0;letter-spacing:.5px">▶ VER ${artsPedido.length} MATERIALES</button></div>`;
+            }
             const color = e.color && e.color !== 'NATURAL' && e.color !== '' ? ` · <span style="color:var(--text3)">${e.color}</span>` : '';
             detalle = `<strong style="color:var(--text)">${e.detalle||''}</strong>${color}`;
             // Buscar productos_agregado del mismo usuario en los siguientes 5 minutos
@@ -7487,6 +7503,7 @@ init();
             <button onclick="adminFiltrarEventos('busqueda')" id="efil-busqueda" class="sub-tab-btn" style="font-size:10px">🔍 Búsquedas</button>
             <button onclick="adminFiltrarEventos('kit_cargado')" id="efil-kit" class="sub-tab-btn" style="font-size:10px">📦 Kits</button>
             <button onclick="adminFiltrarEventos('producto_agregado')" id="efil-producto" class="sub-tab-btn" style="font-size:10px">➕ Productos</button>
+            <button onclick="adminFiltrarEventos('pedido_guardado')" id="efil-pedido" class="sub-tab-btn" style="font-size:10px">🧾 Pedidos</button>
         </div>
         <!-- Selector de usuario -->
         <div style="margin-bottom:10px">
