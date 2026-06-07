@@ -6511,6 +6511,7 @@ async function adminVerDetalle(tipo) {
     // Cargar datos y aplicar filtro
     _adminEventosUsuario = '';
     await adminCargarEventos();
+    adminCargarSelectorUsuario();
     adminFiltrarEventos(filtro);
 }
 
@@ -6718,7 +6719,7 @@ async function adminCargarEventos() {
         if (!_adminEventosFiltro) {
             el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Selecciona un filtro para ver eventos</div>`;
         } else {
-            adminRenderUsuariosChips();
+            adminCargarSelectorUsuario();
             adminRenderEventosFiltrados();
         }
     } catch(e) {
@@ -6729,12 +6730,13 @@ async function adminCargarEventos() {
 function adminFiltrarEventos(tipo) {
     _adminEventosFiltro = tipo;
     _adminEventosUsuario = ''; // reset usuario al cambiar tipo
+    const sel = document.getElementById('admin-eventos-usuario-sel');
+    if (sel) sel.value = '';
     ['todos','sesiones','cotizacion','busqueda','kit_cargado','producto_agregado'].forEach(t => {
         const id = t === 'kit_cargado' ? 'efil-kit' : t === 'producto_agregado' ? 'efil-producto' : 'efil-' + t;
         const btn = document.getElementById(id);
         if (btn) btn.classList.toggle('active', t === tipo);
     });
-    adminRenderUsuariosChips();
     adminRenderEventosFiltrados();
 }
 
@@ -6748,33 +6750,44 @@ function adminLimpiarVistaEventos() {
     // Resetear a "todos" en vez de vaciar
     _adminEventosFiltro = 'todos';
     _adminEventosUsuario = '';
+    const sel = document.getElementById('admin-eventos-usuario-sel');
+    if (sel) sel.value = '';
     ['todos','sesiones','cotizacion','busqueda','efil-kit','efil-producto'].forEach(id => {
         const btn = document.getElementById(id.startsWith('efil-') ? id : 'efil-' + id);
         if (btn) btn.classList.toggle('active', id === 'todos');
     });
-    adminRenderUsuariosChips();
     adminRenderEventosFiltrados();
 }
 
-// ── Chips de usuarios para filtrar ──
+// ── Selector de usuario: cargar desde colección sesiones ──
+async function adminCargarSelectorUsuario() {
+    const sel = document.getElementById('admin-eventos-usuario-sel');
+    if (!sel) return;
+    try {
+        const hace30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        const snap = await _db.collection('sesiones').where('inicio','>',hace30).get();
+        // Usuarios únicos, excluyendo admin
+        const mapaUsuarios = new Map();
+        snap.docs.forEach(d => {
+            const s = d.data();
+            if (s.email === ADMIN_EMAIL) return;
+            if (!mapaUsuarios.has(s.uid)) {
+                mapaUsuarios.set(s.uid, s.nombre || s.email || s.uid);
+            }
+        });
+        // Limpiar opciones anteriores (mantener "Todos")
+        while (sel.options.length > 1) sel.remove(1);
+        mapaUsuarios.forEach((nombre, uid) => {
+            const opt = document.createElement('option');
+            opt.value = uid;
+            opt.textContent = nombre;
+            sel.appendChild(opt);
+        });
+    } catch(e) {}
+}
+
 function adminRenderUsuariosChips() {
-    const el = document.getElementById('admin-eventos-usuarios');
-    if (!el) return;
-
-    // Extraer usuarios únicos del cache según filtro activo
-    let fuente = _adminEventosCache;
-    if (_adminEventosFiltro && _adminEventosFiltro !== 'todos' && _adminEventosFiltro !== 'sesiones') {
-        fuente = _adminEventosCache.filter(e => e.tipo === _adminEventosFiltro);
-    }
-    const usuarios = [...new Map(fuente.map(e => [e.uid, { uid: e.uid, nombre: e.nombre || e.email || '?' }])).values()]
-        .filter(u => u.uid);
-
-    if (!usuarios.length) { el.innerHTML = ''; return; }
-
-    el.innerHTML = `
-        <button onclick="adminFiltrarUsuario('')" class="sub-tab-btn ${!_adminEventosUsuario ? 'active' : ''}" style="font-size:10px;padding:4px 10px">Todos</button>
-        ${usuarios.map(u => `<button onclick="adminFiltrarUsuario('${u.uid}')" class="sub-tab-btn ${_adminEventosUsuario === u.uid ? 'active' : ''}" style="font-size:10px;padding:4px 10px">${u.nombre}</button>`).join('')}
-    `;
+    // Esta función ya no se usa — el selector reemplaza los chips
 }
 
 function adminFiltrarUsuario(uid) {
@@ -6928,6 +6941,24 @@ function adminRenderEventosFiltrados() {
         } else if (e.tipo === 'kit_cargado') {
             const color = e.color && e.color !== 'NATURAL' && e.color !== '' ? ` · <span style="color:var(--text3)">${e.color}</span>` : '';
             detalle = `<strong style="color:var(--text)">${e.detalle||''}</strong>${color}`;
+            // Buscar productos_agregado del mismo usuario en los siguientes 5 minutos
+            const productosKit = _adminEventosCache.filter(x =>
+                x.tipo === 'producto_agregado' && x.uid === e.uid &&
+                x.ts >= e.ts && x.ts - e.ts < 5 * 60 * 1000
+            );
+            if (productosKit.length) {
+                const filasKit = productosKit.map(p =>
+                    `<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--border)">
+                        <span style="font-size:10px;color:var(--text2)">${p.nombre||''}${p.color?' · <span style="color:var(--text3)">'+p.color+'</span>':''}</span>
+                        <span style="font-family:var(--mono);font-size:9px;color:var(--text3)">${p.lista||''}</span>
+                    </div>`
+                ).join('');
+                expandible = `<div id="evdet-${evId}" style="display:none;margin-top:8px;border-top:1px solid var(--border);padding-top:6px">
+                    <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:.5px;margin-bottom:4px">ARTÍCULOS CARGADOS (${productosKit.length})</div>
+                    ${filasKit}
+                </div>`;
+                subDetalle = `<div style="margin-top:4px"><button onclick="adminToggleDetalle('${evId}')" style="font-size:9px;font-family:var(--mono);color:var(--accent);background:none;border:none;cursor:pointer;padding:0;letter-spacing:.5px">▶ VER ${productosKit.length} ARTÍCULOS</button></div>`;
+            }
         } else if (e.tipo === 'producto_agregado') {
             detalle = `<strong>${e.nombre||''}</strong>${e.color?' · '+e.color:''}`;
             if (e.lista) subDetalle = `<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:2px">${e.lista}</div>`;
@@ -7457,8 +7488,14 @@ init();
             <button onclick="adminFiltrarEventos('kit_cargado')" id="efil-kit" class="sub-tab-btn" style="font-size:10px">📦 Kits</button>
             <button onclick="adminFiltrarEventos('producto_agregado')" id="efil-producto" class="sub-tab-btn" style="font-size:10px">➕ Productos</button>
         </div>
-        <!-- Chips de usuario -->
-        <div id="admin-eventos-usuarios" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap"></div>
+        <!-- Selector de usuario -->
+        <div style="margin-bottom:10px">
+            <select id="admin-eventos-usuario-sel"
+                onchange="adminFiltrarUsuario(this.value)"
+                style="width:100%;padding:8px 12px;font-size:13px;font-family:var(--mono);border:1px solid var(--border2);border-radius:var(--radius-xs);background:var(--surface);color:var(--text);appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 12 12%22><path fill=%22%236b7280%22 d=%22M6 8L1 3h10z%22/></svg>');background-repeat:no-repeat;background-position:right 12px center">
+                <option value="">👥 Todos los usuarios</option>
+            </select>
+        </div>
         <!-- Búsqueda + controles -->
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
             <div style="flex:1;position:relative">
