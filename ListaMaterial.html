@@ -6474,24 +6474,33 @@ function adminTab(tab) {
     if (titleEl) titleEl.textContent = titles[tab] || 'Panel Admin';
     if (tab === 'dashboard') adminCargarDashboard();
     if (tab === 'usuarios')  { adminCargarOnline(); adminCargarActividad(); }
-    if (tab === 'eventos')   adminCargarEventos();
+    if (tab === 'eventos')   { _adminEventosCache = []; _adminEventosFiltro = ''; adminCargarEventos(); }
+    if (tab === 'mensajes')  {} // sin carga especial
 }
 
 // Navega desde un KPI card a su detalle correspondiente
-function adminVerDetalle(tipo) {
+async function adminVerDetalle(tipo) {
     if (tipo === 'usuarios') {
         adminTab('usuarios');
-    } else if (tipo === 'sesiones') {
-        adminTab('eventos');
-        setTimeout(() => adminFiltrarEventos('sesiones'), 150);
-    } else {
-        // cotizacion, busqueda → panel eventos con filtro
-        const filtroMap = { cotizacion: 'cotizacion', busqueda: 'busqueda' };
-        const filtro = filtroMap[tipo] || 'todos';
-        adminTab('eventos');
-        // Esperar a que el panel esté cargado antes de aplicar filtro
-        setTimeout(() => adminFiltrarEventos(filtro), 150);
+        return;
     }
+    // Para sesiones, cotizacion, busqueda → ir al panel eventos con filtro directo
+    const filtroMap = { sesiones: 'sesiones', cotizacion: 'cotizacion', busqueda: 'busqueda' };
+    const filtro = filtroMap[tipo] || 'todos';
+    // Navegar al panel sin resetear el cache
+    ['dashboard','usuarios','eventos','mensajes'].forEach(t => {
+        const panel = document.getElementById('apanel-' + t);
+        const btn   = document.getElementById('atab-' + t);
+        if (panel) panel.style.display = t === 'eventos' ? '' : 'none';
+        if (btn)   btn.classList.toggle('active', t === 'eventos');
+    });
+    const backBtn = document.getElementById('admin-back-btn');
+    const titleEl = document.getElementById('admin-panel-title');
+    if (backBtn) backBtn.style.display = '';
+    if (titleEl) titleEl.textContent = 'Eventos';
+    // Cargar datos y aplicar filtro
+    await adminCargarEventos();
+    adminFiltrarEventos(filtro);
 }
 
 function adminVolverDashboard() {
@@ -6526,15 +6535,6 @@ async function adminCargarDashboard() {
 
         // Gráfica circular por función
         adminRenderPieChart(eventos);
-
-        // Funciones más usadas
-        adminRenderStatsChart(eventos);
-
-        // Top búsquedas
-        adminRenderTopBusquedas(eventos);
-
-        // Top productos
-        adminRenderTopProductos(eventos);
 
         // Auto-limpieza datos >30 días
         adminLimpiarDatosAntiguos();
@@ -6704,7 +6704,11 @@ async function adminCargarEventos() {
                 .where('ts', '>', hace30).orderBy('ts','desc').limit(300).get();
             _adminEventosCache = snap.docs.map(d => d.data());
         }
-        adminRenderEventosFiltrados();
+        if (!_adminEventosFiltro) {
+            el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Selecciona un filtro para ver eventos</div>`;
+        } else {
+            adminRenderEventosFiltrados();
+        }
     } catch(e) {
         el.innerHTML = `<div class="card" style="color:var(--danger);font-size:12px;padding:14px">Error: ${e.message}</div>`;
     }
@@ -6720,10 +6724,34 @@ function adminFiltrarEventos(tipo) {
     adminRenderEventosFiltrados();
 }
 
+// ── Colapsar lista de eventos (limpiar vista sin borrar datos) ──
+function adminLimpiarVistaEventos() {
+    const el = document.getElementById('admin-eventos-list');
+    const counter = document.getElementById('admin-eventos-counter');
+    const search = document.getElementById('admin-eventos-search');
+    if (search) search.value = '';
+    if (counter) counter.textContent = '';
+    if (el) el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Selecciona un filtro para ver eventos</div>`;
+    // Desactivar todos los filtros visualmente
+    ['todos','sesiones','cotizacion','busqueda','efil-kit','efil-producto'].forEach(id => {
+        const btn = document.getElementById(id.startsWith('efil-') ? id : 'efil-' + id);
+        if (btn) btn.classList.remove('active');
+    });
+    _adminEventosFiltro = '';
+}
+
 function adminRenderEventosFiltrados() {
     const el = document.getElementById('admin-eventos-list');
+    const counter = document.getElementById('admin-eventos-counter');
     if (!el) return;
+
+    // Si no hay filtro activo (vista limpia), no renderizar nada
+    if (!_adminEventosFiltro) return;
+
     const labels = { 'busqueda':'🔍','kit_cargado':'📦','cotizacion':'💰','ventas':'🛒','pedidos':'📋','comparar':'⚖️','config':'⚙️','producto_agregado':'➕','vidrio':'🪟' };
+
+    // Texto del filtro de búsqueda
+    const textoBusq = (document.getElementById('admin-eventos-search')?.value || '').toLowerCase().trim();
 
     // ── Filtro SESIONES: muestra quién inició sesión y cuánto tiempo estuvo ──
     if (_adminEventosFiltro === 'sesiones') {
@@ -6731,9 +6759,17 @@ function adminRenderEventosFiltrados() {
         const hace30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
         _db.collection('sesiones').where('inicio','>',hace30).orderBy('inicio','desc').limit(100).get()
             .then(snap => {
-                const sesiones = snap.docs.map(d => d.data()).filter(d => d.email !== ADMIN_EMAIL);
+                let sesiones = snap.docs.map(d => d.data()).filter(d => d.email !== ADMIN_EMAIL);
+                // Aplicar filtro de texto
+                if (textoBusq) {
+                    sesiones = sesiones.filter(s =>
+                        (s.nombre||'').toLowerCase().includes(textoBusq) ||
+                        (s.email||'').toLowerCase().includes(textoBusq)
+                    );
+                }
+                if (counter) counter.textContent = sesiones.length ? `${sesiones.length} SESIÓN${sesiones.length!==1?'ES':''}` : '';
                 if (!sesiones.length) {
-                    el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Sin sesiones registradas</div>`;
+                    el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">${textoBusq ? 'Sin coincidencias' : 'Sin sesiones registradas'}</div>`;
                     return;
                 }
                 el.innerHTML = sesiones.map(s => {
@@ -6757,16 +6793,28 @@ function adminRenderEventosFiltrados() {
     }
 
     // ── Filtros normales desde eventos_global ──
-    const lista = _adminEventosFiltro === 'todos'
+    let lista = _adminEventosFiltro === 'todos'
         ? _adminEventosCache.filter(e => ['busqueda','kit_cargado','cotizacion','producto_agregado'].includes(e.tipo))
         : _adminEventosCache.filter(e => e.tipo === _adminEventosFiltro);
 
+    // Aplicar filtro de texto sobre nombre, email, detalle, cliente
+    if (textoBusq) {
+        lista = lista.filter(e =>
+            (e.nombre||'').toLowerCase().includes(textoBusq) ||
+            (e.email||'').toLowerCase().includes(textoBusq) ||
+            (e.detalle||'').toLowerCase().includes(textoBusq) ||
+            (e.cliente||'').toLowerCase().includes(textoBusq)
+        );
+    }
+
+    if (counter) counter.textContent = lista.length ? `${lista.length} EVENTO${lista.length!==1?'S':''}` : '';
+
     if (!lista.length) {
-        el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Sin eventos de este tipo</div>`;
+        el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">${textoBusq ? 'Sin coincidencias para "'+textoBusq+'"' : 'Sin eventos de este tipo'}</div>`;
         return;
     }
 
-    el.innerHTML = lista.slice(0,80).map(e => {
+    el.innerHTML = lista.slice(0,60).map(e => {
         const hora = new Date(e.ts).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
         let detalle = '';
         let subDetalle = '';
@@ -7253,17 +7301,6 @@ init();
             </div>
             <div id="admin-pie-empty" style="display:none;text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:16px 0">Sin datos aún</div>
         </div>
-        <!-- Top eventos -->
-        <div class="section-divider-label">FUNCIONES MÁS USADAS (30d)</div>
-        <div id="admin-stats-chart" class="card" style="padding:14px;margin-bottom:12px;min-height:60px">
-            <div style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:12px 0">Cargando...</div>
-        </div>
-        <!-- Top búsquedas -->
-        <div class="section-divider-label">BÚSQUEDAS MÁS FRECUENTES</div>
-        <div id="admin-top-busquedas" class="card" style="padding:14px;margin-bottom:12px;min-height:40px"></div>
-        <!-- Top productos -->
-        <div class="section-divider-label">PRODUCTOS MÁS AGREGADOS</div>
-        <div id="admin-top-productos" class="card" style="padding:14px;margin-bottom:12px;min-height:40px"></div>
         <!-- Accesos secundarios -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:80px">
             <button onclick="adminTab('usuarios')" class="btn-main ghost-btn" style="margin:0;font-size:11px;font-family:var(--mono);letter-spacing:.5px">👥 VER SESIONES</button>
@@ -7285,7 +7322,8 @@ init();
 
     <!-- PANEL: EVENTOS -->
     <div id="apanel-eventos" class="container" style="padding-top:12px;display:none">
-        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+        <!-- Filtros de tipo -->
+        <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
             <button onclick="adminFiltrarEventos('todos')" id="efil-todos" class="sub-tab-btn active" style="font-size:10px">Todos</button>
             <button onclick="adminFiltrarEventos('sesiones')" id="efil-sesiones" class="sub-tab-btn" style="font-size:10px">👤 Sesiones</button>
             <button onclick="adminFiltrarEventos('cotizacion')" id="efil-cotizacion" class="sub-tab-btn" style="font-size:10px">💰 Cotizaciones</button>
@@ -7293,8 +7331,22 @@ init();
             <button onclick="adminFiltrarEventos('kit_cargado')" id="efil-kit" class="sub-tab-btn" style="font-size:10px">📦 Kits</button>
             <button onclick="adminFiltrarEventos('producto_agregado')" id="efil-producto" class="sub-tab-btn" style="font-size:10px">➕ Productos</button>
         </div>
+        <!-- Búsqueda + controles -->
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+            <div style="flex:1;position:relative">
+                <input id="admin-eventos-search" type="search" placeholder="Filtrar por usuario, detalle…"
+                    autocomplete="off"
+                    oninput="adminRenderEventosFiltrados()"
+                    style="padding:8px 12px 8px 32px;font-size:12px;font-family:var(--mono);margin:0;width:100%;box-sizing:border-box">
+                <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none;color:var(--text3)">🔍</span>
+            </div>
+            <button onclick="adminLimpiarVistaEventos()" title="Colapsar lista"
+                style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-xs);padding:7px 10px;font-size:13px;cursor:pointer;flex-shrink:0;color:var(--text3)">🗑</button>
+        </div>
+        <!-- Contador de resultados -->
+        <div id="admin-eventos-counter" style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-bottom:8px;text-align:right;letter-spacing:.5px"></div>
         <div id="admin-eventos-list" style="min-height:60px;margin-bottom:80px">
-            <div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando...</div>
+            <div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Selecciona un filtro para ver eventos</div>
         </div>
     </div>
 
