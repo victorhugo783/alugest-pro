@@ -3,8 +3,8 @@
 //  Requerido por FCM para notificaciones en background
 // ══════════════════════════════════════════════
 
-importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
 
 firebase.initializeApp({
     apiKey: "AIzaSyCH1fPqUeAI8pdzTw6LK8_EtzlVDaOkFqY",
