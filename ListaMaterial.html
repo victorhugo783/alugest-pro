@@ -10,11 +10,15 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="AluGest Pro">
+    <!-- ── Fuentes (preconnect para carga sin bloqueo) ── -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap">
     <!-- ── Firebase ── -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js" defer></script>
     <script>
     const firebaseConfig = {
         apiKey: "AIzaSyCH1fPqUeAI8pdzTw6LK8_EtzlVDaOkFqY",
@@ -126,8 +130,6 @@
             --shadow:      0 1px 3px rgba(0,0,0,0.05), 0 4px 14px rgba(59,91,219,0.07);
             --shadow-lg:   0 8px 28px rgba(0,0,0,0.10);
         }
-
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html { -webkit-tap-highlight-color: transparent; }
@@ -3058,7 +3060,9 @@ function _enqueuePendingSync(payload) {
         // Reemplaza entradas previas del mismo tipo+uid para no acumular duplicados
         const filtered = queue.filter(e => !(e.type === payload.type && e.uid === payload.uid));
         filtered.push({ ...payload, ts: Date.now() });
-        localStorage.setItem(PENDING_KEY, JSON.stringify(filtered));
+        // Máximo 50 entradas — descarta las más antiguas si se supera
+        const capped = filtered.length > 50 ? filtered.slice(filtered.length - 50) : filtered;
+        localStorage.setItem(PENDING_KEY, JSON.stringify(capped));
     } catch (e) { /* localStorage lleno — ignorar */ }
 }
 
@@ -3159,8 +3163,52 @@ function showToast(msg, type = 'success') {
     t.textContent = msg;
     t.className = `toast ${type} show`;
     clearTimeout(t._to);
-    t._to = setTimeout(() => { t.classList.remove('show'); }, 2400);
+    const duration = Math.max(2400, Math.min((msg || '').length * 55, 5000));
+    t._to = setTimeout(() => { t.classList.remove('show'); }, duration);
 }
+
+// ── MODAL DIALOG — reemplaza confirm() y prompt() nativos ─────────────────
+// Uso: _dialog({ title, body, confirm, cancel, input, defaultVal }) → Promise<string|bool>
+let _dialogResolve = null;
+function _dialog({ title = '', body = '', confirm = 'ACEPTAR', cancel = 'CANCELAR', input = false, defaultVal = '', danger = false } = {}) {
+    return new Promise(resolve => {
+        _dialogResolve = resolve;
+        const m  = document.getElementById('modal-dialog');
+        const tEl = document.getElementById('modal-dialog-title');
+        const bEl = document.getElementById('modal-dialog-body');
+        const inp = document.getElementById('modal-dialog-input');
+        const ok  = document.getElementById('modal-dialog-ok');
+        const cn  = document.getElementById('modal-dialog-cancel');
+        tEl.textContent = title;
+        bEl.textContent = body;
+        ok.textContent  = confirm;
+        cn.textContent  = cancel;
+        ok.style.background = danger ? 'var(--danger)' : '';
+        if (input) {
+            inp.style.display = 'block';
+            inp.value = defaultVal || '';
+            setTimeout(() => inp.focus(), 100);
+        } else {
+            inp.style.display = 'none';
+        }
+        m.style.display = 'flex';
+    });
+}
+function _dialogConfirm() {
+    const m   = document.getElementById('modal-dialog');
+    const inp = document.getElementById('modal-dialog-input');
+    m.style.display = 'none';
+    if (_dialogResolve) {
+        const val = inp.style.display !== 'none' ? inp.value : true;
+        _dialogResolve(val);
+        _dialogResolve = null;
+    }
+}
+function _dialogCancel() {
+    document.getElementById('modal-dialog').style.display = 'none';
+    if (_dialogResolve) { _dialogResolve(null); _dialogResolve = null; }
+}
+
 function normalizeText(text) { return (text || "").toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/n\u0303/g, "n").toUpperCase().trim(); }
 function toUpper(v) { return (v || '').trim().toUpperCase(); }
 function clearFieldError(inputId, errorId) { const i = document.getElementById(inputId); const w = i?.closest('.ghost-wrap'); if(w) w.classList.remove('invalid'); const e = document.getElementById(errorId); if(e) e.classList.remove('visible'); }
@@ -3292,8 +3340,8 @@ function handleSearch(val) {
         const cat = p.category || 'perfil';
         const aliasBadge = aliasMatch ? `<span class="alias-match-badge">🏷️ alias</span>` : '';
         return `<div class="dropdown-item" onclick="selectFromSearch(${p.id})">
-            <div><div class="dropdown-item-name">${(p.name || 'SIN NOMBRE').toUpperCase()} <span class="cat-badge ${cat}">${cat}</span>${aliasBadge}</div>
-            <div class="dropdown-item-color">${p.color || 'N/A'}</div></div>
+            <div><div class="dropdown-item-name">${esc(p.name || 'SIN NOMBRE').toUpperCase()} <span class="cat-badge ${cat}">${cat}</span>${aliasBadge}</div>
+            <div class="dropdown-item-color">${esc(p.color || 'N/A')}</div></div>
             <span class="dropdown-item-price">$${(price * IVA).toFixed(2)}</span>
         </div>`;
     }).join('');
@@ -3329,26 +3377,29 @@ function getActiveCart() {
     return s || data;
 }
 function addSection() {
-    const name = prompt('Nombre de la sección (ej: Ventanas 3", Puertas):');
-    if (!name || !name.trim()) return;
-    const s = { id: Date.now(), name: name.trim().toUpperCase(), cart: {}, lastAddedOrder: [], cartInsumos: [] };
-    if (!data.cartSections) data.cartSections = [];
-    if (!data.ventaHistory) data.ventaHistory = [];
-    data.cartSections.push(s);
-    _activeSectionId = s.id;
-    save();
-    renderSelectedList();
-    showToast(`✓ SECCIÓN "${s.name}" CREADA`, 'success');
+    _dialog({ title: 'Nueva sección', body: '', input: true, defaultVal: '', confirm: 'CREAR' }).then(name => {
+        if (!name || !name.trim()) return;
+        const s = { id: Date.now(), name: name.trim().toUpperCase(), cart: {}, lastAddedOrder: [], cartInsumos: [] };
+        if (!data.cartSections) data.cartSections = [];
+        if (!data.ventaHistory) data.ventaHistory = [];
+        data.cartSections.push(s);
+        _activeSectionId = s.id;
+        save();
+        renderSelectedList();
+        showToast(`✓ SECCIÓN "${s.name}" CREADA`, 'success');
+    });
 }
 function deleteSection(id) {
     const s = data.cartSections.find(x => x.id === id);
     if (!s) return;
-    if (!confirm(`¿Eliminar la sección "${s.name}"?`)) return;
-    data.cartSections = data.cartSections.filter(x => x.id !== id);
-    if (_activeSectionId === id) _activeSectionId = null;
-    save();
-    renderSelectedList();
-    showToast('Sección eliminada', 'info');
+    _dialog({ title: 'Eliminar sección', body: `¿Eliminar la sección "${s.name}"?`, confirm: 'ELIMINAR', danger: true }).then(ok => {
+        if (!ok) return;
+        data.cartSections = data.cartSections.filter(x => x.id !== id);
+        if (_activeSectionId === id) _activeSectionId = null;
+        save();
+        renderSelectedList();
+        showToast('Sección eliminada', 'info');
+    });
 }
 function switchSection(id) {
     _activeSectionId = (id === null || id === 'null' || id === undefined) ? null : id;
@@ -3357,11 +3408,12 @@ function switchSection(id) {
 function renameSection(id) {
     const s = data.cartSections.find(x => x.id === id);
     if (!s) return;
-    const name = prompt('Nuevo nombre:', s.name);
-    if (!name || !name.trim()) return;
-    s.name = name.trim().toUpperCase();
-    save();
-    renderSelectedList();
+    _dialog({ title: 'Renombrar sección', body: '', input: true, defaultVal: s.name, confirm: 'GUARDAR' }).then(name => {
+        if (!name || !name.trim()) return;
+        s.name = name.trim().toUpperCase();
+        save();
+        renderSelectedList();
+    });
 }
 function getTotalAllSections() {
     // Merge all carts (main + sections) for consolidated totals
@@ -3651,63 +3703,61 @@ function renderFloatingBar() {
 }
 function confirmClearAll() {
     if (_activeSectionId === null) {
-        // Sección GENERAL activa
         const hasSections = (data.cartSections || []).length > 0;
         if (hasSections) {
-            // Ask: clear just general, or everything?
-            const choice = confirm('¿Limpiar solo la sección GENERAL?\n\nAcepta = solo GENERAL\nCancela = limpiar TODO (incluyendo secciones)');
-            if (choice) {
+            _dialog({ title: 'Limpiar lista', body: '¿Limpiar solo la sección GENERAL o todo incluyendo secciones?', confirm: 'SOLO GENERAL', cancel: 'TODO', danger: false }).then(choice => {
+                if (choice === true) {
+                    // Solo GENERAL
+                    data.cart = {}; data.lastAddedOrder = []; data.cartInsumos = [];
+                    _kitFallbackIds.clear();
+                    save(); renderSelectedList(); showToast('Sección GENERAL limpiada', 'info');
+                } else if (choice === null) {
+                    // Botón CANCELAR = limpiar TODO — pedir segunda confirmación
+                    _dialog({ title: '¿Borrar TODO?', body: 'Se eliminarán la lista principal y todas las secciones. Esta acción no se puede deshacer.', confirm: 'BORRAR TODO', cancel: 'CANCELAR', danger: true }).then(ok2 => {
+                        if (!ok2) return;
+                        data.cart = {}; data.lastAddedOrder = []; data.cartInsumos = [];
+                        data.cartSections = []; _activeSectionId = null;
+                        data._clientName = ''; const _bcEl = document.getElementById('budget-client'); if(_bcEl) _bcEl.value = '';
+                        _currentInvoiceId = null;
+                        _kitFallbackIds.clear();
+                        save(); renderSelectedList(); showToast('Todo limpiado', 'info');
+                    });
+                }
+            });
+        } else {
+            _dialog({ title: 'Limpiar lista', body: '¿Limpiar todos los artículos?', confirm: 'LIMPIAR', danger: true }).then(ok => {
+                if (!ok) return;
                 data.cart = {}; data.lastAddedOrder = []; data.cartInsumos = [];
-                _kitFallbackIds.clear();
-                save(); renderSelectedList(); showToast('Sección GENERAL limpiada', 'info');
-            } else {
-                if (!confirm('¿Seguro que quieres borrar TODO, incluyendo todas las secciones?')) return;
-                data.cart = {}; data.lastAddedOrder = []; data.cartInsumos = [];
-                data.cartSections = []; _activeSectionId = null;
                 data._clientName = ''; const _bcEl = document.getElementById('budget-client'); if(_bcEl) _bcEl.value = '';
                 _currentInvoiceId = null;
                 _kitFallbackIds.clear();
-                save(); renderSelectedList(); showToast('Todo limpiado', 'info');
-            }
-        } else {
-            if (!confirm('¿Limpiar todos los artículos?')) return;
-            data.cart = {}; data.lastAddedOrder = []; data.cartInsumos = [];
-            data._clientName = ''; const _bcEl = document.getElementById('budget-client'); if(_bcEl) _bcEl.value = '';
-            _currentInvoiceId = null;
-            _kitFallbackIds.clear();
-            save(); renderSelectedList(); showToast('Lista limpiada', 'info');
+                save(); renderSelectedList(); showToast('Lista limpiada', 'info');
+            });
         }
     } else {
-        // Una sección específica está activa — solo limpiar esa
         const s = data.cartSections.find(x => x.id === _activeSectionId);
         const name = s ? s.name : 'esta sección';
-        if (!confirm(`¿Limpiar los artículos de "${name}"?`)) return;
-        if (s) { s.cart = {}; s.lastAddedOrder = []; s.cartInsumos = []; }
-        save(); renderSelectedList(); showToast(`"${name}" limpiada`, 'info');
+        _dialog({ title: 'Limpiar sección', body: `¿Limpiar los artículos de "${name}"?`, confirm: 'LIMPIAR', danger: true }).then(ok => {
+            if (!ok) return;
+            if (s) { s.cart = {}; s.lastAddedOrder = []; s.cartInsumos = []; }
+            save(); renderSelectedList(); showToast(`"${name}" limpiada`, 'info');
+        });
     }
 }
-function saveAndShow() { vibrate(30);
+function _saveAndShowContinue(clientInput) {
     const now = new Date();
     const dateStr = now.toLocaleDateString([], { day:'2-digit', month:'2-digit', year:'numeric' });
-    let clientInput = toUpper(data._clientName || document.getElementById('budget-client')?.value || '');
-    if (!clientInput) { if (confirm("No ingresaste nombre de cliente. ¿Usar 'PÚBLICO EN GENERAL'?")) clientInput = 'PÚBLICO EN GENERAL'; else return; }
-
     // ── Consolidar secciones ──
     const sections = data.cartSections || [];
     const hasSections = sections.length > 0;
-
-    // Merge all carts for consolidated cart storage
     const mergedCart = { ...data.cart };
     sections.forEach(s => {
         Object.entries(s.cart || {}).forEach(([pid, qty]) => {
             mergedCart[pid] = (mergedCart[pid] || 0) + qty;
         });
     });
-
-    // Build itemsSnapshot: if sections exist, annotate with section name
     let itemsSnapshot = [];
     if (hasSections) {
-        // Main section items (no label)
         Object.entries(data.cart).forEach(([pid, qty]) => {
             const p = data.prods.find(x => x.id == pid);
             if (!p) return;
@@ -3727,8 +3777,6 @@ function saveAndShow() { vibrate(30);
             return { id: p.id, name: p.name || 'MATERIAL SIN ESPECIFICAR', color: p.color || 'N/A', category: p.category || 'perfil', measureGroup: p.measureGroup || '', price: getProdMaxPrice(p), qty: Number(qty) };
         }).filter(Boolean);
     }
-
-    // Merge insumos
     const mergedInsumos = JSON.parse(JSON.stringify(data.cartInsumos || []));
     sections.forEach(s => {
         (s.cartInsumos || []).forEach(ins => {
@@ -3737,7 +3785,6 @@ function saveAndShow() { vibrate(30);
             else mergedInsumos.push({ ...ins });
         });
     });
-
     const existingIndex = data.history.findIndex(h => h.id === _currentInvoiceId);
     let folio, finalId;
     if (existingIndex !== -1) {
@@ -3756,13 +3803,24 @@ function saveAndShow() { vibrate(30);
     const btn = document.getElementById('btn-generar');
     btn.classList.add('success-state'); btn.textContent = '✓ GUARDADO';
     setTimeout(() => { btn.classList.remove('success-state'); btn.textContent = 'GENERAR TICKET'; }, 1500);
-    // Clear everything
     data.cart = {}; data.lastAddedOrder = []; data.cartInsumos = [];
     data.cartSections = []; _activeSectionId = null;
     data._clientName = ''; const _bcEl = document.getElementById('budget-client'); if(_bcEl) _bcEl.value = '';
     save();
     renderSelectedList();
     viewInvoice(finalId);
+}
+function saveAndShow() {
+    vibrate(30);
+    let clientInput = toUpper(data._clientName || document.getElementById('budget-client')?.value || '');
+    if (!clientInput) {
+        _dialog({ title: 'Sin nombre de cliente', body: "¿Usar 'PÚBLICO EN GENERAL'?", confirm: 'SÍ, CONTINUAR', cancel: 'CANCELAR' }).then(ok => {
+            if (!ok) return;
+            _saveAndShowContinue('PÚBLICO EN GENERAL');
+        });
+        return;
+    }
+    _saveAndShowContinue(clientInput);
 }
 function checkBackupAlert() { document.getElementById('backup-alert').style.display = (data.history.length - (data.lastBackupCount || 0) >= 20) ? 'block' : 'none'; }
 // ── Factura / ticket ──
@@ -3775,7 +3833,11 @@ function viewInvoice(id) {
     document.getElementById('p-client-view').innerText = h.client;
     document.getElementById('p-date-view').innerText = h.date;
     document.getElementById('p-folio-view').innerText = h.folio;
-    document.getElementById('btn-edit-from-modal').onclick = () => { if(confirm('¿Deseas modificar este pedido? Se cargará en la pantalla principal para editar.')) editHistoryItem(id); };
+    document.getElementById('btn-edit-from-modal').onclick = () => {
+        _dialog({ title: 'Modificar pedido', body: 'Se cargará en la pantalla principal para editar.', confirm: 'MODIFICAR', cancel: 'CANCELAR' }).then(ok => {
+            if (ok) editHistoryItem(id);
+        });
+    };
     // Use saved insumosSnapshot if available; old tickets without it show no insumos (correct behavior)
     const insumos = Array.isArray(h.insumosSnapshot) ? h.insumosSnapshot : [];
     _currentInvoiceInsumos = insumos;
@@ -3949,7 +4011,14 @@ function toggleInvRow(rowId, checked) {
     else row.classList.remove('checked-row');
 }
 function adjustTableHeaderStickyTop() { const toolbar = document.getElementById('invoice-toolbar'); const ths = document.querySelectorAll('#invoice-table th'); if(!ths.length) return; let top = (toolbar && toolbar.style.display !== 'none' && toolbar.offsetHeight) ? toolbar.offsetHeight : 0; ths.forEach(th => th.style.top = top + 'px'); }
-function removeHistory(id) { if(confirm('¿Eliminar este pedido?')) { data.history = data.history.filter(x => x.id !== id); if(_currentInvoiceId === id) _currentInvoiceId = null; save(); renderHistory(); showToast('Pedido eliminado','info'); } }
+function removeHistory(id) {
+    _dialog({ title: 'Eliminar pedido', body: '¿Eliminar este pedido? Esta acción no se puede deshacer.', confirm: 'ELIMINAR', danger: true }).then(ok => {
+        if (!ok) return;
+        data.history = data.history.filter(x => x.id !== id);
+        if(_currentInvoiceId === id) _currentInvoiceId = null;
+        save(); renderHistory(); showToast('Pedido eliminado','info');
+    });
+}
 function renderHistory() {
     const container = document.getElementById('history-list');
     const searchVal = normalizeText(document.getElementById('history-search')?.value || '');
@@ -4034,7 +4103,7 @@ function renderPriceEditor(append) {
         const distsToShow = _activeDist === 'TODOS' ? data.distributors : [_activeDist];
         const distRows = distsToShow.map(d=>{ const pData = (p.prices && p.prices[d]!==undefined) ? p.prices[d] : {val:0,date:0}; const val = typeof pData === 'object' ? pData.val : pData; const date = typeof pData === 'object' ? pData.date : 0; const isOld = date>0 && (Date.now()-date)>(90*24*60*60*1000); const dateLabel = date>0 ? new Date(date).toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'2-digit'}) : 'Sin fecha'; const oldBadge = isOld ? '<span class="price-old-badge">⏳ antiguo</span>' : ''; return `<div class="dist-price-row"><span class="dist-label">${d}${oldBadge}<span class="price-date-hint">${dateLabel}</span></span><input type="text" inputmode="decimal" value="${val>0?maskMoneyDisplay(val):''}" placeholder="0.00" class="price-masked" style="${isOld?'border-color:rgba(220,38,38,0.4);':''}" data-raw="${val}" onfocus="priceMaskFocus(this)" onblur="priceMaskBlur(this, ${p.id}, '${d}')" oninput="priceMaskInput(this)"></div>`; }).join('');
         const measureHtml = (p.category === 'vidrio') ? `<div class="measure-group-field"><span>📐 Grupo de Medida:</span><div class="ghost-wrap" style="height:36px; margin:0; flex:1;"><span class="ghost-bg" id="ghost-measure-${p.id}"></span><input type="text" id="measure-${p.id}" value="${p.measureGroup||''}" placeholder="Ej. 120X60-4MM" oninput="updateMeasureGroup(${p.id}, this.value)" onkeyup="ghostUpdateMeasure('measure-${p.id}','ghost-measure-${p.id}')" style="text-transform:uppercase; background:transparent;"></div></div>` : '';
-        card.innerHTML = `<div class="mat-card-header"><div style="max-width:75%; flex:1;"><div class="mat-card-name" contenteditable="true" oninput="forceUpperCaseOnEditable(this)" onblur="updateField(${p.id},'name',this.innerText)">${p.name||'SIN NOMBRE'}</div><div class="mat-card-color" contenteditable="true" oninput="forceUpperCaseOnEditable(this)" onblur="updateField(${p.id},'color',this.innerText)">${p.color||'N/A'}</div><div class="mat-alias-row"><span class="mat-alias-icon">🏷️</span><input class="mat-alias-input" type="text" value="${(p.aliases||[]).join(', ').replace(/"/g,'&quot;')}" placeholder="Sinónimos: cabezal, riel superior, guia... (separados por coma)" onblur="updateAliases(${p.id}, this.value)" oninput="this.value=this.value.toUpperCase()"></div><div class="edit-cat-controls"><select id="cat-select-${p.id}" onchange="updateProductCategory(${p.id}, this.value)"><option value="perfil" ${p.category==='perfil'?'selected':''}>Perfil</option><option value="vidrio" ${p.category==='vidrio'?'selected':''}>Vidrio</option><option value="herraje" ${p.category==='herraje'?'selected':''}>Herraje</option><option value="consumible" ${p.category==='consumible'?'selected':''}>Consumible</option></select><label style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text2);"><input type="checkbox" id="colorizable-${p.id}" ${p.colorizable!==false?'checked':''} onchange="updateProductColorizable(${p.id}, this.checked)"> Colorizable</label></div>${measureHtml}</div><button class="btn-icon" onclick="deleteProduct(${p.id})" style="color:var(--danger); flex-shrink:0; margin-left:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6l-1 14H6L5 6"/><path d="M8 6V4h8v2"/></svg></button></div><div class="mat-price-grid">${distRows}</div>`;
+        card.innerHTML = `<div class="mat-card-header"><div style="max-width:75%; flex:1;"><div class="mat-card-name" contenteditable="true" oninput="forceUpperCaseOnEditable(this)" onblur="updateField(${p.id},'name',this.innerText)">${esc(p.name)||'SIN NOMBRE'}</div><div class="mat-card-color" contenteditable="true" oninput="forceUpperCaseOnEditable(this)" onblur="updateField(${p.id},'color',this.innerText)">${esc(p.color)||'N/A'}</div><div class="mat-alias-row"><span class="mat-alias-icon">🏷️</span><input class="mat-alias-input" type="text" value="${esc((p.aliases||[]).join(', '))}" placeholder="Sinónimos: cabezal, riel superior, guia... (separados por coma)" onblur="updateAliases(${p.id}, this.value)" oninput="this.value=this.value.toUpperCase()"></div><div class="edit-cat-controls"><select id="cat-select-${p.id}" onchange="updateProductCategory(${p.id}, this.value)"><option value="perfil" ${p.category==='perfil'?'selected':''}>Perfil</option><option value="vidrio" ${p.category==='vidrio'?'selected':''}>Vidrio</option><option value="herraje" ${p.category==='herraje'?'selected':''}>Herraje</option><option value="consumible" ${p.category==='consumible'?'selected':''}>Consumible</option></select><label style="display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text2);"><input type="checkbox" id="colorizable-${p.id}" ${p.colorizable!==false?'checked':''} onchange="updateProductColorizable(${p.id}, this.checked)"> Colorizable</label></div>${measureHtml}</div><button class="btn-icon" onclick="deleteProduct(${p.id})" style="color:var(--danger); flex-shrink:0; margin-left:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6l-1 14H6L5 6"/><path d="M8 6V4h8v2"/></svg></button></div><div class="mat-price-grid">${distRows}</div>`;
         frag.appendChild(card);
         if(p.category==='vidrio') setTimeout(()=>{ const inp = document.getElementById(`measure-${p.id}`); if(inp) inp.addEventListener('blur',()=>{ save(); showToast('Grupo actualizado'); }); },0);
     });
@@ -4086,12 +4155,14 @@ function aplicarPorcentaje() {
 function deshacerPrecios() {
     const respaldo = localStorage.getItem('respaldo_materiales');
     if(!respaldo) { showToast('No hay respaldo disponible','info'); return; }
-    if(!confirm('¿Restaurar precios al estado anterior?')) return;
-    data.prods = JSON.parse(respaldo);
-    save();
-    renderAll();
-    document.getElementById('btn-deshacer').style.display = 'none';
-    showToast('✓ Precios restaurados al estado anterior','success');
+    _dialog({ title: 'Restaurar precios', body: '¿Restaurar precios al estado anterior? Los cambios actuales se perderán.', confirm: 'RESTAURAR', danger: true }).then(ok => {
+        if (!ok) return;
+        data.prods = JSON.parse(respaldo);
+        save();
+        renderAll();
+        document.getElementById('btn-deshacer').style.display = 'none';
+        showToast('✓ Precios restaurados al estado anterior','success');
+    });
 }
 function toggleTheme() {
     const root = document.documentElement;
@@ -4150,7 +4221,15 @@ function updateAliases(id, val) {
     save();
     _priceEditorCache.key = null; // invalida caché para reflejar cambios en búsqueda
 }
-function deleteProduct(id) { if(confirm('¿Eliminar material?')) { data.prods = data.prods.filter(x=>x.id !== id); delete data.cart[id]; cleanupOrphanedKitItems(); save(); renderAll(); } }
+function deleteProduct(id) {
+    _dialog({ title: 'Eliminar material', body: '¿Eliminar este material del catálogo?', confirm: 'ELIMINAR', danger: true }).then(ok => {
+        if (!ok) return;
+        data.prods = data.prods.filter(x=>x.id !== id);
+        delete data.cart[id];
+        cleanupOrphanedKitItems();
+        save(); renderAll();
+    });
+}
 function ghostUpdate(inputId, ghostId, sourceFn) { const input = document.getElementById(inputId); const ghost = document.getElementById(ghostId); if(!input||!ghost) return; const q = input.value; if(!q) { ghost.textContent=''; return; } const sugg = sourceFn(q); if(sugg && sugg.toLowerCase().startsWith(q.toLowerCase())) ghost.textContent = q + sugg.slice(q.length); else ghost.textContent=''; }
 function getAcNames(q) { const qN = normalizeText(q); const m = data.prods.find(p=> normalizeText(p.name).startsWith(qN)); return m ? m.name : ''; }
 function getAcColors(q) { const qN = normalizeText(q); const m = data.prods.find(p=> p.color && normalizeText(p.color).startsWith(qN)); return m ? m.color : ''; }
@@ -4159,7 +4238,10 @@ function exportData() { if(!_fbIsAdmin){showToast('Sin permisos','info');return;
 function importData() { if(!_fbIsAdmin){showToast('Sin permisos','info');return;} document.getElementById('import-file').click(); }
 function handleImport(inp) { const file = inp.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = e => { try { const imp = JSON.parse(e.target.result); if(imp.prods) { data = {...data, ...imp}; if(!data.kits) data.kits=[]; if(!data.ventaHistory) data.ventaHistory=[]; if(!data.cartSections) data.cartSections=[]; save(); renderAllScreens(); buildDistTabs(); renderKitsScreen(); showToast('✓ IMPORTADO'); } } catch(e) { showToast('ERROR AL IMPORTAR','info'); } }; reader.readAsText(file); inp.value = ''; }
 function renderAll() { const active = document.querySelector('.screen.active')?.id; if(active === 'screen-budget') { renderSelectedList(); populateKitSelector(true); } if(active === 'screen-history') { const container = document.getElementById('history-list'); if(container) container.innerHTML = ''; renderHistory(); } if(active === 'screen-config') { renderPriceEditor(); } }
+// renderAllScreens: reconstruye todas las pantallas (solo para init o importación completa)
 function renderAllScreens() { renderSelectedList(); renderHistory(); renderPriceEditor(); populateKitSelector(); }
+// renderActiveScreen: versión ligera post-init — solo la pantalla visible
+function renderActiveScreen() { const active = document.querySelector('.screen.active')?.id; if(active === 'screen-budget') { renderSelectedList(); populateKitSelector(true); } else if(active === 'screen-history') { const container = document.getElementById('history-list'); if(container) container.innerHTML = ''; renderHistory(); } else if(active === 'screen-config') { renderPriceEditor(); } else if(active === 'screen-kits') { renderKitsScreen(); } else { renderSelectedList(); } }
 
 // ═══════════════════════════ MÓDULO KITS ═══════════════════════════
 let _kitBuilderProds = [];
@@ -4945,16 +5027,17 @@ function renderKitsScreen() {
         if (!inner || !kitId || card._swipeInit) return;
         card._swipeInit = true;
         attachSwipe(card, inner, bg, () => {
-            if (confirm(`¿Eliminar la línea "${getKitById(kitId)?.name || kitId}"?`)) {
-                data.kits = data.kits.filter(k => k.id !== kitId);
-                save(); populateKitSelector(true);
-                renderKitsScreen();
-                showToast('Línea eliminada', 'info');
-            } else {
-                // snap back
-                inner.style.transition = 'transform 0.25s ease';
-                inner.style.transform = 'translateX(0)';
-            }
+            _dialog({ title: `Eliminar línea`, body: `¿Eliminar "${getKitById(kitId)?.name || kitId}"?`, confirm: 'ELIMINAR', danger: true }).then(ok => {
+                if (ok) {
+                    data.kits = data.kits.filter(k => k.id !== kitId);
+                    save(); populateKitSelector(true);
+                    renderKitsScreen();
+                    showToast('Línea eliminada', 'info');
+                } else {
+                    inner.style.transition = 'transform 0.25s ease';
+                    inner.style.transform = 'translateX(0)';
+                }
+            });
         });
     });
 }
@@ -5053,7 +5136,7 @@ function duplicateKit(kitId) {
     populateKitSelector(true);
     showToast(`Kit duplicado: "${newKit.name}"`, 'success');
 }
-function renameKit(kitId) { const kit = getKitById(kitId); if(!kit) return; const newName = prompt('Nuevo nombre del kit:', kit.name); if(newName && newName.trim()) { kit.name = newName.trim().toUpperCase(); save(); renderKitsScreen(); populateKitSelector(true); showToast(`Kit renombrado a "${kit.name}"`,'success'); } }
+function renameKit(kitId) { const kit = getKitById(kitId); if(!kit) return; _dialog({ title: 'Renombrar kit', body: '', input: true, defaultVal: kit.name, confirm: 'GUARDAR' }).then(newName => { if(newName && newName.trim()) { kit.name = newName.trim().toUpperCase(); save(); renderKitsScreen(); populateKitSelector(true); showToast(`Kit renombrado a "${kit.name}"`,'success'); } }); }
 function saveKitName(kitId) {
     const kit = getKitById(kitId);
     if (!kit) return;
@@ -5068,10 +5151,16 @@ function saveKitName(kitId) {
     if (nameEl) nameEl.textContent = newName;
     showToast(`✓ Línea renombrada a "${newName}"`, 'success');
 }
-function deleteKit(kitId) { if(confirm('¿Eliminar este kit permanentemente?')) { data.kits = data.kits.filter(k=>k.id!==kitId); save(); renderKitsScreen(); populateKitSelector(true); showToast('Kit eliminado','info'); } }
+function deleteKit(kitId) {
+    _dialog({ title: 'Eliminar kit', body: '¿Eliminar este kit permanentemente?', confirm: 'ELIMINAR', danger: true }).then(ok => {
+        if (!ok) return;
+        data.kits = data.kits.filter(k=>k.id!==kitId);
+        save(); renderKitsScreen(); populateKitSelector(true); showToast('Kit eliminado','info');
+    });
+}
 let _kbTimer = null;
 function debouncedKitBuilderSearch(val) { clearTimeout(_kbTimer); _kbTimer = setTimeout(()=>kitBuilderSearch(val),180); }
-function kitBuilderSearch(val) { const dd = document.getElementById('kit-builder-dropdown'); if(!val) { dd.style.display='none'; return; } const norm = normalizeText(val); const matches = data.prods.filter(p=> normalizeText(`${p.name} ${p.color} ${p.category}`).includes(norm) || (p.aliases||[]).some(a=>normalizeText(a).includes(norm))).slice(0,12); dd.innerHTML = matches.map(p=>{ const price = getProdMaxPrice(p); const cat = p.category||'perfil'; const aliasHit = !(normalizeText(`${p.name} ${p.color} ${p.category}`).includes(norm)) && (p.aliases||[]).some(a=>normalizeText(a).includes(norm)); return `<div class="dropdown-item" onclick="addToKitBuilder(${p.id})"><div><div class="dropdown-item-name">${(p.name||'').toUpperCase()} <span class="cat-badge ${cat}">${cat}</span>${aliasHit?'<span class="alias-match-badge">🏷️ alias</span>':''}</div><div class="dropdown-item-color">${(p.color||'N/A').toUpperCase()}</div></div><span class="dropdown-item-price">$${(price*IVA).toFixed(2)}</span></div>`; }).join(''); dd.style.display = matches.length ? 'block' : 'none'; }
+function kitBuilderSearch(val) { const dd = document.getElementById('kit-builder-dropdown'); if(!val) { dd.style.display='none'; return; } const norm = normalizeText(val); const matches = data.prods.filter(p=> normalizeText(`${p.name} ${p.color} ${p.category}`).includes(norm) || (p.aliases||[]).some(a=>normalizeText(a).includes(norm))).slice(0,12); dd.innerHTML = matches.map(p=>{ const price = getProdMaxPrice(p); const cat = p.category||'perfil'; const aliasHit = !(normalizeText(`${p.name} ${p.color} ${p.category}`).includes(norm)) && (p.aliases||[]).some(a=>normalizeText(a).includes(norm)); return `<div class="dropdown-item" onclick="addToKitBuilder(${p.id})"><div><div class="dropdown-item-name">${esc(p.name||'').toUpperCase()} <span class="cat-badge ${cat}">${cat}</span>${aliasHit?'<span class="alias-match-badge">🏷️ alias</span>':''}</div><div class="dropdown-item-color">${esc(p.color||'N/A').toUpperCase()}</div></div><span class="dropdown-item-price">$${(price*IVA).toFixed(2)}</span></div>`; }).join(''); dd.style.display = matches.length ? 'block' : 'none'; }
 function addToKitBuilder(prodId) { const existing = _kitBuilderProds.find(x=>x.prodId==prodId); if(existing) existing.qty++; else _kitBuilderProds.push({ prodId, qty:1 }); document.getElementById('kit-builder-search').value = ''; document.getElementById('kit-builder-dropdown').style.display = 'none'; renderKitBuilderList(); }
 function renderKitBuilderList() { const wrap = document.getElementById('kit-builder-prods-wrap'); const list = document.getElementById('kit-builder-prods-list'); if(!_kitBuilderProds.length) { wrap.style.display='none'; return; } wrap.style.display='block'; list.innerHTML = _kitBuilderProds.map((item,idx)=>{ const p = data.prods.find(x=>x.id==item.prodId); const name = p ? (p.name||'SIN NOMBRE').toUpperCase() : '(ELIMINADO)'; return `<div class="kit-builder-prod-row"><span class="kit-builder-prod-name">${name}</span><input type="number" min="1" value="${item.qty}" class="kit-builder-prod-qty" onchange="kitBuilderSetQty(${idx},this.value)" oninput="kitBuilderSetQty(${idx},this.value)"><button class="kit-builder-remove" onclick="kitBuilderRemove(${idx})" title="Quitar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>`; }).join(''); }
 function kitBuilderSetQty(idx, val) { const n = parseInt(val); if(n>0 && _kitBuilderProds[idx]) _kitBuilderProds[idx].qty = n; }
@@ -5788,9 +5877,18 @@ function saveVentaCotizacion() {
     }
     let cliente = (document.getElementById('ventas-client')?.value || '').trim().toUpperCase();
     if (!cliente) {
-        if (!confirm("Sin nombre de cliente. ¿Usar 'PÚBLICO EN GENERAL'?")) return;
-        cliente = 'PÚBLICO EN GENERAL';
+        _dialog({ title: 'Sin nombre de cliente', body: "¿Usar 'PÚBLICO EN GENERAL'?", confirm: 'SÍ, CONTINUAR', cancel: 'CANCELAR' }).then(ok => {
+            if (!ok) return;
+            _saveVentaCotizacionContinue('PÚBLICO EN GENERAL');
+        });
+        return;
     }
+    _saveVentaCotizacionContinue(cliente);
+}
+
+function _saveVentaCotizacionContinue(cliente) {
+    const includePerfiles = _pedItems.some(x => parseFloat(x.metros) > 0);
+    const includeVidrios  = _vidItems.some(v => parseFloat(v.anchoCorte) > 0 && parseFloat(v.altoCorte) > 0);
     const now = new Date();
     const dateStr = now.toLocaleDateString([], { day:'2-digit', month:'2-digit', year:'numeric' });
     const margenPed = parseFloat(document.getElementById('ped-margen')?.value) || 0;
@@ -5846,7 +5944,6 @@ function saveVentaCotizacion() {
     // Limpiar ambas listas — la cotización ya quedó guardada completa
     _pedItems = []; _pedFallbackIdxs.clear(); pedRenderAll();
     _vidItems = []; vidRenderAll();
-}
 
 function renderVentaHistory() {
     const el = document.getElementById('vcotiz-list');
@@ -6030,10 +6127,12 @@ function toggleVentaDetail(id) {
 function deleteVentaCotiz(id) {
     const h = (data.ventaHistory || []).find(x => x.id === id);
     if (!h) return;
-    if (!confirm('¿Eliminar cotización #' + h.folio + ' de ' + h.cliente + '?')) return;
-    data.ventaHistory = data.ventaHistory.filter(x => x.id !== id);
-    save();
-    renderVentaHistory();
+    _dialog({ title: 'Eliminar cotización', body: `¿Eliminar cotización #${h.folio} de ${h.cliente}?`, confirm: 'ELIMINAR', danger: true }).then(ok => {
+        if (!ok) return;
+        data.ventaHistory = data.ventaHistory.filter(x => x.id !== id);
+        save();
+        renderVentaHistory();
+    });
 }
 
 // ══════════════════════════════════════════
@@ -6232,11 +6331,23 @@ function cmpRender() {
 // ══════════════════════════════════════════════
 
 const VAPID_KEY    = 'BOpvgRh_GAoyx39_SniYmUBlt7Yw6-xWqJga8A23nq3GGIVEB610fjmPAz3TDZkBRZ1TcxjeMO9qLxdMNkM3x0E';
-const ADMIN_EMAIL  = 'garciachavezvictorhugo0@gmail.com';
+// Constante usada en filtros del panel admin para excluir la sesión propia del admin
+const ADMIN_EMAIL = 'garciachavezvictorhugo0@gmail.com';
+
+// ── Sanitizador HTML — previene XSS al insertar datos en innerHTML ──
+function esc(str) {
+    return (str == null ? '' : String(str))
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
 
 let _messaging         = null;
 let _sessionStart      = Date.now();
 let _sessionRef        = null;
+let _sessionIntervalId = null;  // referencia del intervalo de actividad para poder limpiarlo
 let _currentUser       = null;
 let _fbIsAdmin         = false;   // fuente de verdad: Firestore role, NO email
 let _fbLoaded          = false;
@@ -6366,7 +6477,8 @@ async function registrarSesion(user) {
     } catch (e) { console.warn('[Sesión] Error registrando sesión:', e.message); return; }
     window.addEventListener('beforeunload', cerrarSesion);
     document.addEventListener('visibilitychange', () => actualizarActividad(!document.hidden));
-    setInterval(() => { if (!document.hidden) actualizarActividad(true); }, 60000);
+    if (_sessionIntervalId) clearInterval(_sessionIntervalId);
+    _sessionIntervalId = setInterval(() => { if (!document.hidden) actualizarActividad(true); }, 60000);
     if (!_fbIsAdmin) {
         try {
             await _db.collection('notificaciones_admin').add({
@@ -7254,7 +7366,9 @@ async function doRegister() {
 }
 
 function fbSignOut() {
-    if (confirm('¿Cerrar sesión?')) _auth.signOut();
+    _dialog({ title: 'Cerrar sesión', body: '¿Cerrar sesión?', confirm: 'CERRAR SESIÓN', cancel: 'CANCELAR', danger: true }).then(ok => {
+        if (ok) _auth.signOut();
+    });
 }
 
 async function fbLoadCatalogo() {
@@ -7350,7 +7464,7 @@ _auth.onAuthStateChanged(async (user) => {
             _fbLoaded = true;
             init();
         } else {
-            renderAllScreens();
+            renderActiveScreen();
             renderKitsScreen();
         }
 
@@ -7363,7 +7477,7 @@ _auth.onAuthStateChanged(async (user) => {
                     btn.id = 'btn-signout';
                     btn.className = 'btn-main ghost-btn';
                     btn.style.cssText = 'margin:8px 0;width:100%;color:var(--danger)';
-                    btn.innerHTML = '🚪 Cerrar sesión (' + (user.displayName || user.email) + ')';
+                    btn.innerHTML = '🚪 Cerrar sesión (' + esc(user.displayName || user.email) + ')';
                     btn.onclick = fbSignOut;
                     configScreen.querySelector('.container')?.appendChild(btn);
                 }
@@ -7397,6 +7511,7 @@ _auth.onAuthStateChanged(async (user) => {
         _currentUser = null;
         _fbIsAdmin   = false;
         cerrarSesion();
+        if (_sessionIntervalId) { clearInterval(_sessionIntervalId); _sessionIntervalId = null; }
         _adminUnsubscribes.forEach(u => u());
         _adminUnsubscribes = [];
         aplicarVisibilidadAdmin(false);
@@ -7421,11 +7536,30 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-// Inicializar
-init();
+// Inicializar — esperar a que el DOM esté completamente parseado
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init(); // DOM ya listo (scripts con defer)
+}
 
 </script>
 <!-- MODAL: Número de unidades -->
+<!-- MODAL: Confirm/Prompt reutilizable (reemplaza alert/confirm/prompt nativos) -->
+<div id="modal-dialog" style="display:none;position:fixed;inset:0;z-index:99990;background:rgba(0,0,0,0.55);display:none;align-items:flex-end;justify-content:center;padding-bottom:env(safe-area-inset-bottom)" onclick="if(event.target===this)_dialogCancel()">
+    <div style="background:var(--panel);border-radius:var(--radius-lg) var(--radius-lg) 0 0;padding:24px 20px 20px;width:100%;max-width:480px;box-shadow:0 -8px 40px rgba(0,0,0,0.25);animation:screenIn 0.25s cubic-bezier(.22,.68,0,1.12) both">
+        <div id="modal-dialog-title" style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px;line-height:1.4"></div>
+        <div id="modal-dialog-body" style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.5"></div>
+        <input id="modal-dialog-input" type="text" autocomplete="off" autocorrect="off" spellcheck="false"
+            style="display:none;margin-bottom:14px;font-size:15px"
+            onkeydown="if(event.key==='Enter')_dialogConfirm()">
+        <div style="display:flex;gap:10px">
+            <button id="modal-dialog-cancel" class="btn-main ghost-btn" style="flex:1;margin:0" onclick="_dialogCancel()">CANCELAR</button>
+            <button id="modal-dialog-ok" class="btn-main" style="flex:1;margin:0" onclick="_dialogConfirm()">ACEPTAR</button>
+        </div>
+    </div>
+</div>
+
 <div id="modal-units" class="units-modal-overlay" style="display:none" onclick="if(event.target===this)closeUnitsModal()">
     <div class="units-modal">
         <div class="units-modal-title">Cargar al carrito</div>
