@@ -1,14 +1,12 @@
-// AluGest Pro — Service Worker v4
+// AluGest Pro — Service Worker v5
 // Estrategia: Network First con fallback a caché
 // Ciclo de vida: skipWaiting + clients.claim para activación inmediata
 
-const CACHE_NAME   = 'alugest-v4';
+const CACHE_NAME   = 'alugest-v5';
 const CACHE_ASSETS = ['./ListaMaterial.html', './manifest.json'];
 
 // ── INSTALL: cachear assets críticos y tomar control de inmediato ──
 self.addEventListener('install', (event) => {
-    // skipWaiting garantiza que el nuevo SW no espera
-    // a que las pestañas antiguas se cierren
     self.skipWaiting();
     event.waitUntil(
         caches.open(CACHE_NAME).then(cache => cache.addAll(CACHE_ASSETS))
@@ -24,8 +22,6 @@ self.addEventListener('activate', (event) => {
                     .filter(k => k !== CACHE_NAME)
                     .map(k => caches.delete(k))
             ))
-            // clients.claim() fuerza a las pestañas ya abiertas a usar
-            // este SW sin necesidad de recargar manualmente
             .then(() => self.clients.claim())
     );
 });
@@ -47,18 +43,15 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
         fetch(event.request)
             .then(response => {
-                // response.ok cubre 200-299 y evita cachear respuestas opaque
-                // (status 0) de CDNs externos con CORS restrictivo
                 if (response && response.ok) {
                     const responseClone = response.clone();
                     caches.open(CACHE_NAME)
                         .then(cache => cache.put(event.request, responseClone))
-                        .catch(() => {}); // falla silenciosa — caché es solo respaldo
+                        .catch(() => {});
                 }
                 return response;
             })
             .catch(() =>
-                // Sin red: servir desde caché, o fallback al HTML principal
                 caches.match(event.request)
                     .then(cached => cached || caches.match('./ListaMaterial.html'))
             )
