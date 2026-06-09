@@ -6809,6 +6809,11 @@ function adminRenderEventosFiltrados() {
     // Si no hay filtro activo, usar 'todos' por defecto
     if (!_adminEventosFiltro) _adminEventosFiltro = 'todos';
 
+    // Cancelar listener de sesiones si cambiamos a otro filtro
+    if (_adminEventosFiltro !== 'sesiones' && window._sesionesUnsub) {
+        window._sesionesUnsub(); window._sesionesUnsub = null;
+    }
+
     const labels = { 'busqueda':'🔍','kit_cargado':'📦','cotizacion':'💰','ventas':'🛒','pedidos':'📋','comparar':'⚖️','config':'⚙️','producto_agregado':'➕','vidrio':'🪟','pedido_guardado':'🧾' };
 
     // Texto del filtro de búsqueda
@@ -6817,38 +6822,71 @@ function adminRenderEventosFiltrados() {
     // ── Filtro SESIONES: muestra quién inició sesión y cuánto tiempo estuvo ──
     if (_adminEventosFiltro === 'sesiones') {
         el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando sesiones...</div>`;
+
+        // Cancelar listener anterior si existe
+        if (window._sesionesUnsub) { window._sesionesUnsub(); window._sesionesUnsub = null; }
+
         const hace30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
-        _db.collection('sesiones').where('inicio','>',hace30).orderBy('inicio','desc').limit(100).get()
-            .then(snap => {
-                let sesiones = snap.docs.map(d => d.data()).filter(d => d.email !== ADMIN_EMAIL);
-                // Aplicar filtro de texto
-                if (textoBusq) {
-                    sesiones = sesiones.filter(s =>
-                        (s.nombre||'').toLowerCase().includes(textoBusq) ||
-                        (s.email||'').toLowerCase().includes(textoBusq)
-                    );
-                }
-                if (counter) counter.textContent = sesiones.length ? `${sesiones.length} SESIÓN${sesiones.length!==1?'ES':''}` : '';
-                if (!sesiones.length) {
-                    el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">${textoBusq ? 'Sin coincidencias' : 'Sin sesiones registradas'}</div>`;
+        // onSnapshot → actualización en tiempo real sin recargar
+        window._sesionesUnsub = _db.collection('sesiones')
+            .where('inicio','>',hace30).orderBy('inicio','desc').limit(100)
+            .onSnapshot(snap => {
+                const elNow = document.getElementById('admin-eventos-list');
+                const counterNow = document.getElementById('admin-eventos-counter');
+                // Si el filtro ya cambió, cancelar el listener y salir
+                if (_adminEventosFiltro !== 'sesiones') {
+                    if (window._sesionesUnsub) { window._sesionesUnsub(); window._sesionesUnsub = null; }
                     return;
                 }
-                el.innerHTML = sesiones.map(s => {
+                // Umbral: si ultimaActividad hace más de 5 min → considerar inactivo
+                const INACTIVO_MS = 5 * 60 * 1000;
+                const ahora = Date.now();
+                let sesiones = snap.docs.map(d => d.data()).filter(d => d.email !== ADMIN_EMAIL);
+                // Aplicar filtro de texto
+                const textoAct = (document.getElementById('admin-eventos-search')?.value || '').toLowerCase().trim();
+                if (textoAct) {
+                    sesiones = sesiones.filter(s =>
+                        (s.nombre||'').toLowerCase().includes(textoAct) ||
+                        (s.email||'').toLowerCase().includes(textoAct)
+                    );
+                }
+                if (counterNow) counterNow.textContent = sesiones.length ? `${sesiones.length} SESIÓN${sesiones.length!==1?'ES':''}` : '';
+                if (!sesiones.length) {
+                    if (elNow) elNow.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">${textoAct ? 'Sin coincidencias' : 'Sin sesiones registradas'}</div>`;
+                    return;
+                }
+                const html = sesiones.map(s => {
                     const ds = s.duracionSegundos;
-                    const dur = ds
-                        ? (ds < 60 ? `${ds}s` : ds < 3600 ? `${Math.round(ds/60)} min` : `${Math.floor(ds/3600)}h ${Math.round((ds%3600)/60)}min`)
-                        : (s.activo ? '🟢 En línea ahora' : 'Sin cerrar');
+                    // Determinar si realmente sigue activo: activo==true Y ultimaActividad reciente
+                    const ultimaAct = s.ultimaActividad || s.inicio;
+                    const realmenteActivo = s.activo && (ahora - ultimaAct) < INACTIVO_MS;
+                    let dur, durColor;
+                    if (ds) {
+                        dur = ds < 60 ? `${ds}s` : ds < 3600 ? `${Math.round(ds/60)} min` : `${Math.floor(ds/3600)}h ${Math.round((ds%3600)/60)}min`;
+                        durColor = 'var(--accent)';
+                    } else if (realmenteActivo) {
+                        const minActivo = Math.round((ahora - s.inicio) / 60000);
+                        dur = `🟢 En línea · ${minActivo < 60 ? minActivo + ' min' : Math.floor(minActivo/60) + 'h ' + (minActivo%60) + 'm'}`;
+                        durColor = 'var(--success)';
+                    } else {
+                        // activo==true pero sin actividad reciente → sesión huérfana
+                        const minDesde = Math.round((ahora - ultimaAct) / 60000);
+                        dur = minDesde < 60 ? `Inactivo ${minDesde} min` : `Inactivo ${Math.floor(minDesde/60)}h`;
+                        durColor = 'var(--warning)';
+                    }
                     const fecha = new Date(s.inicio).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
                     return `<div class="card" style="margin-bottom:6px;padding:10px 12px">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
                             <span style="font-size:14px;font-weight:700;color:var(--text)">👤 ${s.nombre||s.email}</span>
-                            <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:${s.activo?'var(--success)':'var(--accent)'}">${dur}</span>
+                            <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:${durColor}">${dur}</span>
                         </div>
                         <div style="font-family:var(--mono);font-size:10px;color:var(--text3)">${fecha}</div>
                     </div>`;
                 }).join('');
-            }).catch(() => {
-                el.innerHTML = `<div class="card" style="color:var(--danger);font-size:12px;padding:14px">Error cargando sesiones</div>`;
+                if (elNow) elNow.innerHTML = html;
+            }, () => {
+                const elErr = document.getElementById('admin-eventos-list');
+                if (elErr) elErr.innerHTML = `<div class="card" style="color:var(--danger);font-size:12px;padding:14px">Error cargando sesiones</div>`;
             });
         return;
     }
@@ -7110,9 +7148,12 @@ async function adminCargarActividad() {
         el.innerHTML = sesiones.map((s) => {
             // Duración
             const ds = s.duracionSegundos;
+            const _ahoraAct = Date.now();
+            const _ultimaAct = s.ultimaActividad || s.inicio;
+            const _realActivo = s.activo && (_ahoraAct - _ultimaAct) < 5 * 60 * 1000;
             const dur = ds
                 ? (ds < 60 ? `${ds}s` : ds < 3600 ? `${Math.round(ds/60)} min` : `${Math.floor(ds/3600)}h ${Math.round((ds%3600)/60)}min`)
-                : (s.activo ? '🟢 En línea' : '—');
+                : (_realActivo ? '🟢 En línea' : '—');
 
             // Fecha/hora de inicio
             const fechaInicio = new Date(s.inicio).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
