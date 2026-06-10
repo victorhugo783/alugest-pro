@@ -7863,281 +7863,339 @@ init();
 </style>
 
 <script>
-// ══════════════════════════════════════════
-// MOTOR DE AUDIO (Web Audio API)
-// Todos los sonidos son sintéticos — sin archivos externos
-// ══════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+// ALUGEST PRO · MOTOR SENSORIAL v2
+//
+// Estrategia háptica cross-platform:
+//   Android (Chrome/PWA) → navigator.vibrate()  [API nativa]
+//   iOS Safari / PWA     → pulso de audio ultrabajo (200 Hz,
+//                          envolvente muy corta) que activa el
+//                          motor táctil del altavoz del iPhone.
+//                          Apple no expone Haptic Engine a web,
+//                          pero este truco funciona con el volumen
+//                          del dispositivo ≥ 30%.
+//
+// El AudioContext se crea UNA sola vez al primer toque del usuario.
+// ══════════════════════════════════════════════════════════════════
 const _AG = (() => {
-    let ctx = null;
 
-    function _ctx() {
-        if (!ctx) {
-            try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+    // ─── AudioContext singleton ────────────────────────────────────
+    let _ac = null;
+    function ctx() {
+        if (!_ac) {
+            try { _ac = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
         }
-        // Resume si fue suspendido por política de autoplay
-        if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
-        return ctx;
+        if (_ac && _ac.state === 'suspended') _ac.resume().catch(()=>{});
+        return _ac;
     }
 
-    // Genera un tono simple con envolvente ADSR
-    function _tone(freq, type, gainPeak, attack, decay, sustain, release, startTime, c) {
-        const osc  = c.createOscillator();
-        const gain = c.createGain();
-        osc.type = type;
-        osc.frequency.setValueAtTime(freq, startTime);
-        gain.gain.setValueAtTime(0, startTime);
-        gain.gain.linearRampToValueAtTime(gainPeak, startTime + attack);
-        gain.gain.linearRampToValueAtTime(sustain, startTime + attack + decay);
-        gain.gain.setValueAtTime(sustain, startTime + attack + decay);
-        gain.gain.linearRampToValueAtTime(0, startTime + attack + decay + release);
-        osc.connect(gain);
-        gain.connect(c.destination);
-        osc.start(startTime);
-        osc.stop(startTime + attack + decay + release + 0.01);
+    // ─── Tono genérico ADSR ───────────────────────────────────────
+    // freq: Hz | type: OscillatorType | vol: pico gain
+    // a/d/s/r: attack / decay / sustain / release (segundos)
+    function tone(freq, type, vol, a, d, s, r, when, c) {
+        const o = c.createOscillator();
+        const g = c.createGain();
+        o.type = type;
+        o.frequency.setValueAtTime(freq, when);
+        g.gain.setValueAtTime(0, when);
+        g.gain.linearRampToValueAtTime(vol,  when + a);
+        g.gain.linearRampToValueAtTime(s,    when + a + d);
+        g.gain.setValueAtTime(s,             when + a + d);
+        g.gain.linearRampToValueAtTime(0,    when + a + d + r);
+        o.connect(g); g.connect(c.destination);
+        o.start(when); o.stop(when + a + d + r + 0.01);
     }
 
-    const sounds = {
-        // Agregar artículo al carrito — tick ascendente
+    // ─── Pulso háptico (iOS) ──────────────────────────────────────
+    // Genera ruido blanco filtrado + sub-grave corto que hace vibrar
+    // físicamente el altavoz interno → sensación táctil real.
+    // count  = número de pulsos
+    // gap    = silencio entre pulsos (s)
+    // vol    = intensidad (0.6 – 1.0 recomendado)
+    function hapticPulse(count, gap, vol, when, c) {
+        for (let i = 0; i < count; i++) {
+            const t = when + i * (0.022 + gap);
+            // Sub-grave que mueve el motor
+            tone(180, 'sine', vol, 0.002, 0.012, 0.0, 0.008, t, c);
+            // Capa de ruido filtrado para sensación de "clic"
+            const bufSize = Math.floor(c.sampleRate * 0.018);
+            const buf = c.createBuffer(1, bufSize, c.sampleRate);
+            const d2 = buf.getChannelData(0);
+            for (let j = 0; j < bufSize; j++) d2[j] = (Math.random() * 2 - 1);
+            const src = c.createBufferSource();
+            src.buffer = buf;
+            const bpf = c.createBiquadFilter();
+            bpf.type = 'bandpass';
+            bpf.frequency.value = 800;
+            bpf.Q.value = 1.2;
+            const gn = c.createGain();
+            gn.gain.setValueAtTime(0, t);
+            gn.gain.linearRampToValueAtTime(vol * 0.35, t + 0.002);
+            gn.gain.linearRampToValueAtTime(0, t + 0.018);
+            src.connect(bpf); bpf.connect(gn); gn.connect(c.destination);
+            src.start(t); src.stop(t + 0.025);
+        }
+    }
+
+    // ─── Vibración Android (sigue funcionando en Android Chrome) ──
+    function droid(pattern) {
+        try { navigator.vibrate && navigator.vibrate(pattern); } catch(e) {}
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // BIBLIOTECA DE EFECTOS
+    // Cada función dispara: pulso háptico iOS + vibrate Android + tono UI
+    // ═══════════════════════════════════════════════════════════════
+    const fx = {
+
+        // Tap genérico — cualquier botón
+        tap() {
+            const c = ctx(); if (!c) return;
+            const t = c.currentTime;
+            hapticPulse(1, 0, 0.75, t, c);
+            tone(900, 'sine', 0.06, 0.003, 0.020, 0.0, 0.04, t, c);
+            droid([8]);
+        },
+
+        // Agregar artículo — pulso + nota ascendente
         add() {
-            const c = _ctx(); if (!c) return;
+            const c = ctx(); if (!c) return;
             const t = c.currentTime;
-            _tone(880,  'sine',   0.08, 0.005, 0.04, 0.01, 0.08, t,       c);
-            _tone(1320, 'sine',   0.06, 0.005, 0.04, 0.01, 0.09, t+0.05,  c);
+            hapticPulse(1, 0, 0.85, t, c);
+            tone(880,  'sine', 0.07, 0.004, 0.030, 0.0, 0.06, t,      c);
+            tone(1320, 'sine', 0.05, 0.004, 0.025, 0.0, 0.07, t+0.05, c);
+            droid([12]);
         },
-        // Quitar artículo — tick descendente
+
+        // Quitar / restar — doble pulso + nota descendente
         remove() {
-            const c = _ctx(); if (!c) return;
+            const c = ctx(); if (!c) return;
             const t = c.currentTime;
-            _tone(660, 'sine',   0.07, 0.004, 0.03, 0.01, 0.07, t,      c);
-            _tone(440, 'sine',   0.05, 0.004, 0.03, 0.01, 0.07, t+0.04, c);
+            hapticPulse(2, 0.04, 0.70, t, c);
+            tone(660, 'sine', 0.06, 0.004, 0.025, 0.0, 0.06, t,      c);
+            tone(440, 'sine', 0.04, 0.004, 0.025, 0.0, 0.06, t+0.05, c);
+            droid([8, 20, 8]);
         },
-        // Guardar pedido / ticket generado — fanfarria corta
-        save() {
-            const c = _ctx(); if (!c) return;
+
+        // Eliminar item — pulso fuerte + nota grave
+        del() {
+            const c = ctx(); if (!c) return;
             const t = c.currentTime;
-            _tone(523,  'sine', 0.09, 0.005, 0.06, 0.02, 0.10, t,       c);
-            _tone(659,  'sine', 0.09, 0.005, 0.06, 0.02, 0.12, t+0.08,  c);
-            _tone(784,  'sine', 0.10, 0.005, 0.07, 0.02, 0.16, t+0.16,  c);
-            _tone(1047, 'sine', 0.08, 0.005, 0.05, 0.02, 0.22, t+0.24,  c);
+            hapticPulse(1, 0, 1.0, t, c);
+            tone(300, 'sawtooth', 0.07, 0.003, 0.035, 0.0, 0.08, t, c);
+            droid([25]);
         },
-        // Navegar entre tabs — click neutral
+
+        // Navegar entre tabs — pulso leve
         nav() {
-            const c = _ctx(); if (!c) return;
+            const c = ctx(); if (!c) return;
             const t = c.currentTime;
-            _tone(700, 'sine', 0.045, 0.003, 0.025, 0.005, 0.05, t, c);
+            hapticPulse(1, 0, 0.65, t, c);
+            tone(720, 'sine', 0.040, 0.003, 0.018, 0.0, 0.04, t, c);
+            droid([6]);
         },
-        // Error / confirmación peligrosa — low bump
-        error() {
-            const c = _ctx(); if (!c) return;
+
+        // Guardar ticket — triple pulso ascendente (celebración)
+        save() {
+            const c = ctx(); if (!c) return;
             const t = c.currentTime;
-            _tone(220, 'sawtooth', 0.06, 0.005, 0.07, 0.01, 0.10, t,      c);
-            _tone(180, 'sawtooth', 0.05, 0.005, 0.07, 0.01, 0.10, t+0.09, c);
+            hapticPulse(3, 0.06, 0.90, t, c);
+            tone(523,  'sine', 0.08, 0.004, 0.05, 0.0, 0.09, t,      c);
+            tone(659,  'sine', 0.08, 0.004, 0.05, 0.0, 0.10, t+0.09, c);
+            tone(784,  'sine', 0.09, 0.004, 0.06, 0.0, 0.13, t+0.18, c);
+            tone(1047, 'sine', 0.07, 0.004, 0.05, 0.0, 0.18, t+0.27, c);
+            droid([15, 30, 25, 20, 40]);
         },
-        // Cargar kit — doble click
+
+        // Cargar kit — doble pulso + acorde
         kit() {
-            const c = _ctx(); if (!c) return;
+            const c = ctx(); if (!c) return;
             const t = c.currentTime;
-            _tone(660,  'triangle', 0.065, 0.005, 0.04, 0.01, 0.08, t,       c);
-            _tone(990,  'triangle', 0.065, 0.005, 0.04, 0.01, 0.08, t+0.07,  c);
-            _tone(1320, 'triangle', 0.055, 0.005, 0.03, 0.01, 0.10, t+0.14,  c);
+            hapticPulse(2, 0.07, 0.80, t, c);
+            tone(660,  'triangle', 0.06, 0.004, 0.035, 0.0, 0.07, t,      c);
+            tone(990,  'triangle', 0.06, 0.004, 0.035, 0.0, 0.08, t+0.08, c);
+            tone(1320, 'triangle', 0.05, 0.004, 0.030, 0.0, 0.09, t+0.16, c);
+            droid([8, 15, 8, 15, 20]);
         },
-        // Busqueda / resultado — soft ping
-        search() {
-            const c = _ctx(); if (!c) return;
+
+        // Error — doble pulso pesado
+        error() {
+            const c = ctx(); if (!c) return;
             const t = c.currentTime;
-            _tone(1100, 'sine', 0.04, 0.003, 0.02, 0.005, 0.07, t, c);
+            hapticPulse(2, 0.08, 1.0, t, c);
+            tone(220, 'sawtooth', 0.07, 0.005, 0.060, 0.0, 0.10, t,      c);
+            tone(185, 'sawtooth', 0.06, 0.005, 0.060, 0.0, 0.10, t+0.10, c);
+            droid([30, 15, 30]);
         },
     };
 
-    // Vibración mejorada con patrones
-    const vib = {
-        add()    { try { navigator.vibrate && navigator.vibrate([12]); } catch(e) {} },
-        remove() { try { navigator.vibrate && navigator.vibrate([8, 20, 8]); } catch(e) {} },
-        save()   { try { navigator.vibrate && navigator.vibrate([15, 30, 25, 20, 40]); } catch(e) {} },
-        nav()    { try { navigator.vibrate && navigator.vibrate([6]); } catch(e) {} },
-        error()  { try { navigator.vibrate && navigator.vibrate([30, 15, 30]); } catch(e) {} },
-        kit()    { try { navigator.vibrate && navigator.vibrate([8, 15, 8, 15, 20]); } catch(e) {} },
-        tap()    { try { navigator.vibrate && navigator.vibrate([5]); } catch(e) {} },
-    };
-
-    // ── Ripple visual en elemento ──
+    // ─── Ripple visual ────────────────────────────────────────────
     function ripple(el, e) {
         if (!el) return;
         el.classList.add('ag-ripple-host');
-        const circle = document.createElement('span');
-        circle.className = 'ag-ripple-circle';
-        const rect = el.getBoundingClientRect();
-        const x = (e && e.clientX) ? e.clientX - rect.left : rect.width / 2;
-        const y = (e && e.clientY) ? e.clientY - rect.top  : rect.height / 2;
-        circle.style.left = x + 'px';
-        circle.style.top  = y + 'px';
-        el.appendChild(circle);
-        setTimeout(() => circle.remove(), 500);
+        const span = document.createElement('span');
+        span.className = 'ag-ripple-circle';
+        const r = el.getBoundingClientRect();
+        span.style.left = ((e && e.clientX) ? e.clientX - r.left : r.width  / 2) + 'px';
+        span.style.top  = ((e && e.clientY) ? e.clientY - r.top  : r.height / 2) + 'px';
+        el.appendChild(span);
+        setTimeout(() => span.remove(), 500);
     }
 
-    // ── Burbuja flotante +N encima del botón ──
+    // ─── Burbuja flotante "+1" ────────────────────────────────────
     function floatBadge(el, text) {
         if (!el) return;
-        const rect = el.getBoundingClientRect();
-        const badge = document.createElement('div');
-        badge.className = 'ag-float-badge';
-        badge.textContent = text;
-        badge.style.left = (rect.left + rect.width / 2 - 10) + 'px';
-        badge.style.top  = (rect.top  - 6 + window.scrollY) + 'px';
-        document.body.appendChild(badge);
-        setTimeout(() => badge.remove(), 650);
+        const r = el.getBoundingClientRect();
+        const b = document.createElement('div');
+        b.className = 'ag-float-badge';
+        b.textContent = text;
+        b.style.left = (r.left + r.width / 2 - 10) + 'px';
+        b.style.top  = (r.top  - 6 + window.scrollY) + 'px';
+        document.body.appendChild(b);
+        setTimeout(() => b.remove(), 650);
     }
 
-    // ── Flash en el total al cambiar ──
+    // ─── Flash en la fila del total ───────────────────────────────
     function flashTotal() {
         const el = document.querySelector('#cart-subtotal-inner .total-row');
         if (!el) return;
         el.classList.remove('ag-total-flash');
-        void el.offsetWidth; // reflow
+        void el.offsetWidth;
         el.classList.add('ag-total-flash');
         setTimeout(() => el.classList.remove('ag-total-flash'), 600);
     }
 
-    return { sounds, vib, ripple, floatBadge, flashTotal };
+    return { fx, ripple, floatBadge, flashTotal };
 })();
 
-// ══════════════════════════════════════════
-// INTERCEPCIÓN DE FUNCIONES — wrapping no destructivo
-// Cada wrapper llama a la función original intacta
-// ══════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+// DESBLOQUEO DEL AUDIOCONTEXT
+// iOS/Safari suspende el AudioContext hasta que el usuario interactúa.
+// Al primer toque creamos y resumimos un contexto temporal para
+// "despertarlo"; a partir de ahí todos los sonidos funcionan.
+// ══════════════════════════════════════════════════════════════════
+(function _agBoot() {
+    function unlock() {
+        try {
+            const C = window.AudioContext || window.webkitAudioContext;
+            if (!C) return;
+            const tmp = new C();
+            // Reproducir silencio de 1 muestra para desbloquear
+            const buf = tmp.createBuffer(1, 1, 22050);
+            const src = tmp.createBufferSource();
+            src.buffer = buf;
+            src.connect(tmp.destination);
+            src.start(0);
+            tmp.resume().then(() => {
+                setTimeout(() => tmp.close(), 300);
+            });
+        } catch(e) {}
+    }
+    document.addEventListener('touchstart',  unlock, { once: true, passive: true });
+    document.addEventListener('pointerdown', unlock, { once: true, passive: true });
+})();
 
-// ── 1. modCart: sonido + vibración + float badge + flash total ──
+// ══════════════════════════════════════════════════════════════════
+// WRAPPERS — intercepción no destructiva de funciones existentes
+// ══════════════════════════════════════════════════════════════════
+
+// 1 · modCart — +/− en carrito
 const _origModCart = window.modCart;
 window.modCart = function(id, v) {
-    const btn = event && event.currentTarget ? event.currentTarget
-              : document.querySelector(`.cart-item[data-id="${id}"] .btn-${v > 0 ? 'plus' : 'minus'}`);
+    const evRef = typeof event !== 'undefined' ? event : null;
+    const btnSel = `.cart-item[data-id="${id}"] .btn-${v > 0 ? 'plus' : 'minus'}`;
+    const btn = (evRef && evRef.currentTarget) || document.querySelector(btnSel);
+
     if (v > 0) {
-        _AG.sounds.add();
-        _AG.vib.add();
-        if (btn) _AG.ripple(btn, event);
-        if (btn) _AG.floatBadge(btn, '+1');
+        _AG.fx.add();
+        if (btn) { _AG.ripple(btn, evRef); _AG.floatBadge(btn, '+1'); }
     } else {
-        const src = (window.getActiveCart ? getActiveCart() : window.data);
-        const willRemove = (src && src.cart[id]) ? (src.cart[id] - 1) <= 0 : false;
-        if (willRemove) {
-            _AG.sounds.remove();
-            _AG.vib.remove();
-            // Flash rojo en el item antes de que desaparezca
+        const src = (typeof getActiveCart === 'function') ? getActiveCart() : window.data;
+        const willDel = src && src.cart[id] && (src.cart[id] - 1) <= 0;
+        if (willDel) {
+            _AG.fx.del();
             const itemEl = document.querySelector(`.cart-item[data-id="${id}"]`);
-            if (itemEl) {
-                itemEl.classList.add('ag-delete-flash');
-            }
+            if (itemEl) { itemEl.classList.add('ag-delete-flash'); }
         } else {
-            _AG.sounds.remove();
-            _AG.vib.tap();
-            if (btn) _AG.ripple(btn, event);
+            _AG.fx.remove();
+            if (btn) _AG.ripple(btn, evRef);
         }
     }
     _origModCart.call(this, id, v);
-    // Flash total después del update
     setTimeout(() => _AG.flashTotal(), 30);
 };
 
-// ── 2. selectFromSearch: sonido + ripple en el dropdown item ──
-const _origSelectFromSearch = window.selectFromSearch;
+// 2 · selectFromSearch — seleccionar del dropdown
+const _origSFS = window.selectFromSearch;
 window.selectFromSearch = function(id) {
-    _AG.sounds.add();
-    _AG.vib.add();
-    // floatBadge en el dropdown item tocado
-    const activeItem = document.querySelector('.dropdown-item:active') ||
-                       document.querySelector('.dropdown-item');
-    if (activeItem) _AG.floatBadge(activeItem, '+1');
-    _origSelectFromSearch.call(this, id);
+    _AG.fx.add();
+    const hit = document.querySelector('.dropdown-item:active') || document.querySelector('.dropdown-item');
+    if (hit) _AG.floatBadge(hit, '+1');
+    _origSFS.call(this, id);
     setTimeout(() => _AG.flashTotal(), 60);
 };
 
-// ── 3. saveAndShow: fanfarria de guardado + burst visual en botón ──
-const _origSaveAndShow = window.saveAndShow;
+// 3 · saveAndShow — generar ticket
+const _origSAS = window.saveAndShow;
 window.saveAndShow = function() {
-    // Reproducir antes de que el confirm bloquee el hilo
     const btn = document.getElementById('btn-generar');
-    if (btn) _AG.ripple(btn, null);
-    _origSaveAndShow.call(this);
-    // El toast y la animación de éxito ya aparecen dentro de saveAndShow
-    // Solo agregamos el sonido después (el confirm pudo cancelar — revisar si el pedido fue creado)
+    const evRef = typeof event !== 'undefined' ? event : null;
+    if (btn) _AG.ripple(btn, evRef);
+    _origSAS.call(this);
     setTimeout(() => {
-        const lastH = window.data && window.data.history[0];
-        if (lastH) {
-            _AG.sounds.save();
-            _AG.vib.save();
-            // Burst en el modal invoice si ya está visible
+        if (window.data && window.data.history && window.data.history[0]) {
+            _AG.fx.save();
             const modal = document.getElementById('modal-invoice');
             if (modal && modal.style.display === 'block') {
-                const header = modal.querySelector('.invoice-header');
-                if (header) {
-                    header.classList.remove('ag-burst');
-                    void header.offsetWidth;
-                    header.classList.add('ag-burst');
-                    setTimeout(() => header.classList.remove('ag-burst'), 500);
+                const hdr = modal.querySelector('.invoice-header');
+                if (hdr) {
+                    hdr.classList.remove('ag-burst');
+                    void hdr.offsetWidth;
+                    hdr.classList.add('ag-burst');
+                    setTimeout(() => hdr.classList.remove('ag-burst'), 500);
                 }
             }
         }
-    }, 80);
+    }, 100);
 };
 
-// ── 4. navigate: click de tab ──
-const _origNavigate = window.navigate;
+// 4 · navigate — cambio de tab
+const _origNav = window.navigate;
 window.navigate = function(id, btn) {
-    _AG.sounds.nav();
-    _AG.vib.nav();
+    _AG.fx.nav();
     if (btn) {
         btn.classList.add('ag-nav-pop');
         setTimeout(() => btn.classList.remove('ag-nav-pop'), 320);
     }
-    _origNavigate.call(this, id, btn);
+    _origNav.call(this, id, btn);
 };
 
-// ── 5. Kit cargado ──
-// Interceptar showToast para detectar mensajes de kit
-const _origShowToast = window.showToast;
+// 5 · showToast — detectar kits y errores
+const _origToast = window.showToast;
 window.showToast = function(msg, type) {
-    _origShowToast.call(this, msg, type);
-    if (typeof msg === 'string') {
-        const upper = msg.toUpperCase();
-        if (upper.includes('KIT') && upper.includes('CARGADO')) {
-            _AG.sounds.kit();
-            _AG.vib.kit();
-        } else if (upper.includes('TICKET') || upper.includes('GENERADO') || upper.includes('ACTUALIZADO')) {
-            // ya manejado en saveAndShow — skip
-        } else if (type === 'error' || upper.includes('ERROR') || upper.includes('INVALIDO')) {
-            _AG.sounds.error();
-            _AG.vib.error();
-        }
+    _origToast.call(this, msg, type);
+    if (typeof msg !== 'string') return;
+    const u = msg.toUpperCase();
+    if (u.includes('KIT') && u.includes('CARGADO')) {
+        _AG.fx.kit();
+    } else if (type === 'error' || u.includes('ERROR')) {
+        _AG.fx.error();
     }
 };
 
-// ── 6. Botones primarios (.btn-main) — ripple al tocar ──
+// 6 · Ripple + tap en TODOS los botones tocables
 document.addEventListener('pointerdown', function(e) {
-    const btn = e.target.closest('.btn-main, .btn-mini, .fab-btn');
-    if (btn && !btn.closest('#modal-invoice')) {
-        _AG.ripple(btn, e);
+    const el = e.target.closest('.btn-main, .btn-mini, .fab-btn, .dropdown-item, .sub-tab-btn, .nav-btn, .cmp-kit-select, .pill-btn');
+    if (!el) return;
+    _AG.ripple(el, e);
+    // Tap háptico en cualquier elemento interactivo que no sea un wrapper ya cubierto
+    const isCartBtn   = !!e.target.closest('.btn-minus, .btn-plus');
+    const isNavBtn    = !!e.target.closest('.nav-btn');
+    const isDropItem  = !!e.target.closest('.dropdown-item');
+    if (!isCartBtn && !isNavBtn && !isDropItem) {
+        _AG.fx.tap();
     }
 }, { passive: true });
-
-// ── 7. Nav bar — ripple también en nav-btn ──
-document.addEventListener('click', function(e) {
-    const nb = e.target.closest('.nav-btn');
-    if (nb) _AG.ripple(nb, e);
-}, { passive: true });
-
-// ── 8. Desbloquear AudioContext en el primer toque de usuario ──
-// (política autoplay requiere interacción humana antes de producir audio)
-function _agUnlock() {
-    const c = window.AudioContext || window.webkitAudioContext;
-    if (c) {
-        const tmp = new c();
-        tmp.resume().then(() => tmp.close());
-    }
-    document.removeEventListener('touchstart', _agUnlock);
-    document.removeEventListener('pointerdown', _agUnlock);
-}
-document.addEventListener('touchstart',  _agUnlock, { once: true, passive: true });
-document.addEventListener('pointerdown', _agUnlock, { once: true, passive: true });
 </script>
 
 </body>
