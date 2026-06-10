@@ -2392,16 +2392,253 @@
     </style>
 </head>
 <body>
-<!-- ── SPLASH (visible mientras Firebase verifica sesión) ── -->
-<div id="splash-screen" style="
-    position:fixed;inset:0;z-index:99999;
-    background:#111827;
-    display:flex;align-items:center;justify-content:center;
-">
-    <svg width="72" height="72" viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">
-        <rect width="72" height="72" rx="16" fill="#3b5bdb"/>
-        <text x="36" y="50" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="800" font-size="28" fill="white">AG</text>
-    </svg>
+<!-- ── SPLASH INTRO (animado, visible mientras Firebase verifica sesión) ── -->
+<div id="splash-screen">
+<style>
+#splash-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: #0d1526;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    overflow: hidden;
+}
+/* Fondo con gradientes radiales igual que la app */
+#splash-screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 90% 70% at 15% 5%,  rgba(59,91,219,0.28) 0%, transparent 55%),
+        radial-gradient(ellipse 70% 60% at 85% 95%, rgba(30,60,160,0.20) 0%, transparent 55%),
+        radial-gradient(ellipse 50% 40% at 50% 50%, rgba(20,40,100,0.15) 0%, transparent 70%);
+    pointer-events: none;
+}
+/* ── Líneas de cuadrícula estilo aluminio/industria ── */
+#splash-screen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(59,91,219,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59,91,219,0.06) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    animation: gridFadeIn 0.8s ease 0.1s both;
+}
+@keyframes gridFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* ── Contenedor del logo ── */
+.splash-logo-wrap {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    animation: splashLogoIn 0.55s cubic-bezier(0.22, 0.68, 0, 1.15) 0.15s both;
+}
+@keyframes splashLogoIn {
+    from { opacity: 0; transform: scale(0.72) translateY(16px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ── Ícono glassmorphism ── */
+.splash-icon {
+    width: 88px;
+    height: 88px;
+    border-radius: 22px;
+    background: linear-gradient(145deg, rgba(59,91,219,0.9) 0%, rgba(35,60,180,0.95) 100%);
+    border: 1px solid rgba(100,140,255,0.35);
+    box-shadow:
+        0 0 0 1px rgba(59,91,219,0.3),
+        0 8px 32px rgba(59,91,219,0.45),
+        0 2px 8px rgba(0,0,0,0.4),
+        inset 0 1px 0 rgba(255,255,255,0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+/* Brillo superior del ícono */
+.splash-icon::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 45%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, transparent 100%);
+    border-radius: 22px 22px 0 0;
+}
+/* Shimmer de carga sobre el ícono */
+.splash-icon::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(105deg,
+        transparent 25%,
+        rgba(255,255,255,0.18) 50%,
+        transparent 75%);
+    background-size: 200% 100%;
+    animation: splashShimmer 1.6s ease 0.4s infinite;
+    border-radius: 22px;
+}
+@keyframes splashShimmer {
+    0%   { background-position: 200% 0; opacity: 0; }
+    20%  { opacity: 1; }
+    80%  { opacity: 1; }
+    100% { background-position: -200% 0; opacity: 0; }
+}
+
+/* ── Letras AG dentro del ícono ── */
+.splash-ag {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-weight: 800;
+    font-size: 30px;
+    letter-spacing: -1px;
+    color: #fff;
+    position: relative;
+    z-index: 1;
+    line-height: 1;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+/* ── Texto de nombre de app ── */
+.splash-title {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-weight: 800;
+    font-size: 26px;
+    letter-spacing: -0.5px;
+    color: #e8eeff;
+    line-height: 1;
+    animation: splashTitleIn 0.45s ease 0.45s both;
+}
+@keyframes splashTitleIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.splash-subtitle {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-weight: 400;
+    font-size: 13px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: #4a6aaa;
+    margin-top: 4px;
+    animation: splashSubIn 0.45s ease 0.6s both;
+}
+@keyframes splashSubIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Barra de progreso ── */
+.splash-progress-track {
+    position: relative;
+    z-index: 1;
+    width: 120px;
+    height: 2px;
+    background: rgba(59,91,219,0.2);
+    border-radius: 2px;
+    margin-top: 36px;
+    overflow: hidden;
+    animation: splashBarAppear 0.3s ease 0.7s both;
+}
+@keyframes splashBarAppear {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+.splash-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #3b5bdb, #7c9dff);
+    border-radius: 2px;
+    box-shadow: 0 0 8px rgba(124,157,255,0.6);
+    animation: splashProgressRun 1.8s cubic-bezier(0.4, 0, 0.2, 1) 0.8s both;
+}
+@keyframes splashProgressRun {
+    0%   { width: 0%; }
+    40%  { width: 55%; }
+    70%  { width: 78%; }
+    100% { width: 95%; }
+}
+
+/* ── Tres puntos "cargando" ── */
+.splash-dots {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    gap: 6px;
+    margin-top: 18px;
+    animation: splashDotsAppear 0.3s ease 0.9s both;
+}
+@keyframes splashDotsAppear {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+.splash-dots span {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #3b5bdb;
+    animation: splashDotPulse 1.2s ease-in-out infinite;
+}
+.splash-dots span:nth-child(1) { animation-delay: 0s; }
+.splash-dots span:nth-child(2) { animation-delay: 0.2s; }
+.splash-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes splashDotPulse {
+    0%, 80%, 100% { transform: scale(0.7); opacity: 0.35; }
+    40%            { transform: scale(1.2); opacity: 1; background: #7c9dff; }
+}
+
+/* ── Versión abajo ── */
+.splash-version {
+    position: absolute;
+    bottom: 28px;
+    left: 0; right: 0;
+    text-align: center;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(74,106,170,0.6);
+    animation: splashSubIn 0.4s ease 1s both;
+}
+
+/* ── Fade-out al terminar ── */
+#splash-screen.splash-exit {
+    animation: splashFadeOut 0.38s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+@keyframes splashFadeOut {
+    from { opacity: 1; transform: scale(1); }
+    to   { opacity: 0; transform: scale(1.03); pointer-events: none; }
+}
+</style>
+
+<div class="splash-logo-wrap">
+    <div class="splash-icon">
+        <span class="splash-ag">AG</span>
+    </div>
+    <div>
+        <div class="splash-title">AluGest Pro</div>
+        <div class="splash-subtitle">Gestión de cancelería</div>
+    </div>
+</div>
+<div class="splash-progress-track">
+    <div class="splash-progress-fill"></div>
+</div>
+<div class="splash-dots">
+    <span></span><span></span><span></span>
+</div>
+<div class="splash-version">v2025</div>
 </div>
 
 <!-- ── PANTALLA DE LOGIN ── -->
@@ -7549,13 +7786,24 @@ async function fbLoadHistorial(uid) {
 }
 
 // ─────────────────────────────────────────────
+//  HELPER: ocultar splash con animación suave
+// ─────────────────────────────────────────────
+function hideSplash() {
+    const splash = document.getElementById('splash-screen');
+    if (!splash || splash.style.display === 'none') return;
+    splash.classList.add('splash-exit');
+    splash.addEventListener('animationend', () => {
+        splash.style.display = 'none';
+    }, { once: true });
+}
+
+// ─────────────────────────────────────────────
 //  OBSERVER PRINCIPAL — punto de entrada
 //  Flujo: Auth → verificarRol → UI → analytics
 // ─────────────────────────────────────────────
 _auth.onAuthStateChanged(async (user) => {
     const loginScreen = document.getElementById('login-screen');
     const appMain     = document.getElementById('app-main');
-    const splash      = document.getElementById('splash-screen');
 
     if (user) {
         _currentUser = user;
@@ -7575,8 +7823,8 @@ _auth.onAuthStateChanged(async (user) => {
         ]);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 
-        // ④ Mostrar app
-        splash.style.display      = 'none';
+        // ④ Mostrar app (con fade-out del splash)
+        hideSplash();
         loginScreen.style.display = 'none';
         appMain.style.display     = 'block';
 
@@ -7631,7 +7879,7 @@ _auth.onAuthStateChanged(async (user) => {
         aplicarVisibilidadAdmin(false);
         aplicarPermisosUsuario(false);
 
-        splash.style.display            = 'none';
+        hideSplash();
         loginScreen.style.display       = 'flex';
         loginScreen.style.flexDirection = 'column';
         appMain.style.display           = 'none';
