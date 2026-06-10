@@ -6523,6 +6523,7 @@ function adminVolverDashboard() {
     if (detalle && detalle.style.display !== 'none') {
         adminTab('usuarios');
     } else {
+        // Desde cualquier otra vista (usuarios, eventos, mensajes) → dashboard
         adminTab('dashboard');
     }
 }
@@ -7730,7 +7731,6 @@ init();
         <!-- Filtros de tipo -->
         <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
             <button onclick="adminFiltrarEventos('todos')" id="efil-todos" class="sub-tab-btn active" style="font-size:10px">Todos</button>
-            <button onclick="adminFiltrarEventos('sesiones')" id="efil-sesiones" class="sub-tab-btn" style="font-size:10px">👤 Sesiones</button>
             <button onclick="adminFiltrarEventos('cotizacion')" id="efil-cotizacion" class="sub-tab-btn" style="font-size:10px">💰 Cotizaciones</button>
             <button onclick="adminFiltrarEventos('busqueda')" id="efil-busqueda" class="sub-tab-btn" style="font-size:10px">🔍 Búsquedas</button>
             <button onclick="adminFiltrarEventos('kit_cargado')" id="efil-kit" class="sub-tab-btn" style="font-size:10px">📦 Kits</button>
