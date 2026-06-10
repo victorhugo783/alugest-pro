@@ -7786,5 +7786,359 @@ init();
 
 </div><!-- fin #app-main -->
 
+<!-- ══════════════════════════════════════════════════════════════════════
+     ALUGEST PRO · SISTEMA DE FEEDBACK SENSORIAL
+     Vibración + Audio (Web Audio API) + Efectos visuales
+     Completamente aditivo — no modifica ninguna función existente.
+     ══════════════════════════════════════════════════════════════════════ -->
+<style>
+/* ── Ripple ── */
+.ag-ripple-host { position: relative; overflow: hidden; }
+@keyframes ag-ripple {
+    0%   { transform: scale(0); opacity: 0.45; }
+    100% { transform: scale(2.8); opacity: 0; }
+}
+.ag-ripple-circle {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.55);
+    width: 80px; height: 80px;
+    margin-top: -40px; margin-left: -40px;
+    pointer-events: none;
+    animation: ag-ripple 0.45s ease-out forwards;
+    z-index: 999;
+}
+/* ── Float +1 ── */
+@keyframes ag-float-up {
+    0%   { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-52px) scale(0.7); }
+}
+.ag-float-badge {
+    position: fixed;
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--accent);
+    pointer-events: none;
+    animation: ag-float-up 0.6s cubic-bezier(.22,.68,0,1.1) forwards;
+    z-index: 9999;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.18);
+    letter-spacing: 0.5px;
+}
+/* ── Total flash ── */
+@keyframes ag-total-flash {
+    0%   { background: var(--accent-dim); }
+    60%  { background: var(--accent-dim); }
+    100% { background: transparent; }
+}
+.ag-total-flash {
+    animation: ag-total-flash 0.55s ease-out;
+    border-radius: var(--radius-xs);
+}
+/* ── Ticket success burst ── */
+@keyframes ag-burst-scale {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.035); }
+    70%  { transform: scale(0.985); }
+    100% { transform: scale(1); }
+}
+.ag-burst {
+    animation: ag-burst-scale 0.42s cubic-bezier(.22,.68,0,1.2);
+}
+/* ── Swipe delete flash rojo ── */
+@keyframes ag-delete-flash {
+    0%   { box-shadow: inset 0 0 0 2px var(--danger); }
+    100% { box-shadow: none; }
+}
+.ag-delete-flash {
+    animation: ag-delete-flash 0.35s ease-out;
+}
+/* ── Nav tab pop ── */
+@keyframes ag-nav-pop {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.22); }
+    100% { transform: scale(1); }
+}
+.ag-nav-pop .nav-icon { animation: ag-nav-pop 0.28s cubic-bezier(.22,.68,0,1.4) both !important; }
+</style>
+
+<script>
+// ══════════════════════════════════════════
+// MOTOR DE AUDIO (Web Audio API)
+// Todos los sonidos son sintéticos — sin archivos externos
+// ══════════════════════════════════════════
+const _AG = (() => {
+    let ctx = null;
+
+    function _ctx() {
+        if (!ctx) {
+            try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+        }
+        // Resume si fue suspendido por política de autoplay
+        if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+        return ctx;
+    }
+
+    // Genera un tono simple con envolvente ADSR
+    function _tone(freq, type, gainPeak, attack, decay, sustain, release, startTime, c) {
+        const osc  = c.createOscillator();
+        const gain = c.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, startTime);
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(gainPeak, startTime + attack);
+        gain.gain.linearRampToValueAtTime(sustain, startTime + attack + decay);
+        gain.gain.setValueAtTime(sustain, startTime + attack + decay);
+        gain.gain.linearRampToValueAtTime(0, startTime + attack + decay + release);
+        osc.connect(gain);
+        gain.connect(c.destination);
+        osc.start(startTime);
+        osc.stop(startTime + attack + decay + release + 0.01);
+    }
+
+    const sounds = {
+        // Agregar artículo al carrito — tick ascendente
+        add() {
+            const c = _ctx(); if (!c) return;
+            const t = c.currentTime;
+            _tone(880,  'sine',   0.08, 0.005, 0.04, 0.01, 0.08, t,       c);
+            _tone(1320, 'sine',   0.06, 0.005, 0.04, 0.01, 0.09, t+0.05,  c);
+        },
+        // Quitar artículo — tick descendente
+        remove() {
+            const c = _ctx(); if (!c) return;
+            const t = c.currentTime;
+            _tone(660, 'sine',   0.07, 0.004, 0.03, 0.01, 0.07, t,      c);
+            _tone(440, 'sine',   0.05, 0.004, 0.03, 0.01, 0.07, t+0.04, c);
+        },
+        // Guardar pedido / ticket generado — fanfarria corta
+        save() {
+            const c = _ctx(); if (!c) return;
+            const t = c.currentTime;
+            _tone(523,  'sine', 0.09, 0.005, 0.06, 0.02, 0.10, t,       c);
+            _tone(659,  'sine', 0.09, 0.005, 0.06, 0.02, 0.12, t+0.08,  c);
+            _tone(784,  'sine', 0.10, 0.005, 0.07, 0.02, 0.16, t+0.16,  c);
+            _tone(1047, 'sine', 0.08, 0.005, 0.05, 0.02, 0.22, t+0.24,  c);
+        },
+        // Navegar entre tabs — click neutral
+        nav() {
+            const c = _ctx(); if (!c) return;
+            const t = c.currentTime;
+            _tone(700, 'sine', 0.045, 0.003, 0.025, 0.005, 0.05, t, c);
+        },
+        // Error / confirmación peligrosa — low bump
+        error() {
+            const c = _ctx(); if (!c) return;
+            const t = c.currentTime;
+            _tone(220, 'sawtooth', 0.06, 0.005, 0.07, 0.01, 0.10, t,      c);
+            _tone(180, 'sawtooth', 0.05, 0.005, 0.07, 0.01, 0.10, t+0.09, c);
+        },
+        // Cargar kit — doble click
+        kit() {
+            const c = _ctx(); if (!c) return;
+            const t = c.currentTime;
+            _tone(660,  'triangle', 0.065, 0.005, 0.04, 0.01, 0.08, t,       c);
+            _tone(990,  'triangle', 0.065, 0.005, 0.04, 0.01, 0.08, t+0.07,  c);
+            _tone(1320, 'triangle', 0.055, 0.005, 0.03, 0.01, 0.10, t+0.14,  c);
+        },
+        // Busqueda / resultado — soft ping
+        search() {
+            const c = _ctx(); if (!c) return;
+            const t = c.currentTime;
+            _tone(1100, 'sine', 0.04, 0.003, 0.02, 0.005, 0.07, t, c);
+        },
+    };
+
+    // Vibración mejorada con patrones
+    const vib = {
+        add()    { try { navigator.vibrate && navigator.vibrate([12]); } catch(e) {} },
+        remove() { try { navigator.vibrate && navigator.vibrate([8, 20, 8]); } catch(e) {} },
+        save()   { try { navigator.vibrate && navigator.vibrate([15, 30, 25, 20, 40]); } catch(e) {} },
+        nav()    { try { navigator.vibrate && navigator.vibrate([6]); } catch(e) {} },
+        error()  { try { navigator.vibrate && navigator.vibrate([30, 15, 30]); } catch(e) {} },
+        kit()    { try { navigator.vibrate && navigator.vibrate([8, 15, 8, 15, 20]); } catch(e) {} },
+        tap()    { try { navigator.vibrate && navigator.vibrate([5]); } catch(e) {} },
+    };
+
+    // ── Ripple visual en elemento ──
+    function ripple(el, e) {
+        if (!el) return;
+        el.classList.add('ag-ripple-host');
+        const circle = document.createElement('span');
+        circle.className = 'ag-ripple-circle';
+        const rect = el.getBoundingClientRect();
+        const x = (e && e.clientX) ? e.clientX - rect.left : rect.width / 2;
+        const y = (e && e.clientY) ? e.clientY - rect.top  : rect.height / 2;
+        circle.style.left = x + 'px';
+        circle.style.top  = y + 'px';
+        el.appendChild(circle);
+        setTimeout(() => circle.remove(), 500);
+    }
+
+    // ── Burbuja flotante +N encima del botón ──
+    function floatBadge(el, text) {
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const badge = document.createElement('div');
+        badge.className = 'ag-float-badge';
+        badge.textContent = text;
+        badge.style.left = (rect.left + rect.width / 2 - 10) + 'px';
+        badge.style.top  = (rect.top  - 6 + window.scrollY) + 'px';
+        document.body.appendChild(badge);
+        setTimeout(() => badge.remove(), 650);
+    }
+
+    // ── Flash en el total al cambiar ──
+    function flashTotal() {
+        const el = document.querySelector('#cart-subtotal-inner .total-row');
+        if (!el) return;
+        el.classList.remove('ag-total-flash');
+        void el.offsetWidth; // reflow
+        el.classList.add('ag-total-flash');
+        setTimeout(() => el.classList.remove('ag-total-flash'), 600);
+    }
+
+    return { sounds, vib, ripple, floatBadge, flashTotal };
+})();
+
+// ══════════════════════════════════════════
+// INTERCEPCIÓN DE FUNCIONES — wrapping no destructivo
+// Cada wrapper llama a la función original intacta
+// ══════════════════════════════════════════
+
+// ── 1. modCart: sonido + vibración + float badge + flash total ──
+const _origModCart = window.modCart;
+window.modCart = function(id, v) {
+    const btn = event && event.currentTarget ? event.currentTarget
+              : document.querySelector(`.cart-item[data-id="${id}"] .btn-${v > 0 ? 'plus' : 'minus'}`);
+    if (v > 0) {
+        _AG.sounds.add();
+        _AG.vib.add();
+        if (btn) _AG.ripple(btn, event);
+        if (btn) _AG.floatBadge(btn, '+1');
+    } else {
+        const src = (window.getActiveCart ? getActiveCart() : window.data);
+        const willRemove = (src && src.cart[id]) ? (src.cart[id] - 1) <= 0 : false;
+        if (willRemove) {
+            _AG.sounds.remove();
+            _AG.vib.remove();
+            // Flash rojo en el item antes de que desaparezca
+            const itemEl = document.querySelector(`.cart-item[data-id="${id}"]`);
+            if (itemEl) {
+                itemEl.classList.add('ag-delete-flash');
+            }
+        } else {
+            _AG.sounds.remove();
+            _AG.vib.tap();
+            if (btn) _AG.ripple(btn, event);
+        }
+    }
+    _origModCart.call(this, id, v);
+    // Flash total después del update
+    setTimeout(() => _AG.flashTotal(), 30);
+};
+
+// ── 2. selectFromSearch: sonido + ripple en el dropdown item ──
+const _origSelectFromSearch = window.selectFromSearch;
+window.selectFromSearch = function(id) {
+    _AG.sounds.add();
+    _AG.vib.add();
+    // floatBadge en el dropdown item tocado
+    const activeItem = document.querySelector('.dropdown-item:active') ||
+                       document.querySelector('.dropdown-item');
+    if (activeItem) _AG.floatBadge(activeItem, '+1');
+    _origSelectFromSearch.call(this, id);
+    setTimeout(() => _AG.flashTotal(), 60);
+};
+
+// ── 3. saveAndShow: fanfarria de guardado + burst visual en botón ──
+const _origSaveAndShow = window.saveAndShow;
+window.saveAndShow = function() {
+    // Reproducir antes de que el confirm bloquee el hilo
+    const btn = document.getElementById('btn-generar');
+    if (btn) _AG.ripple(btn, null);
+    _origSaveAndShow.call(this);
+    // El toast y la animación de éxito ya aparecen dentro de saveAndShow
+    // Solo agregamos el sonido después (el confirm pudo cancelar — revisar si el pedido fue creado)
+    setTimeout(() => {
+        const lastH = window.data && window.data.history[0];
+        if (lastH) {
+            _AG.sounds.save();
+            _AG.vib.save();
+            // Burst en el modal invoice si ya está visible
+            const modal = document.getElementById('modal-invoice');
+            if (modal && modal.style.display === 'block') {
+                const header = modal.querySelector('.invoice-header');
+                if (header) {
+                    header.classList.remove('ag-burst');
+                    void header.offsetWidth;
+                    header.classList.add('ag-burst');
+                    setTimeout(() => header.classList.remove('ag-burst'), 500);
+                }
+            }
+        }
+    }, 80);
+};
+
+// ── 4. navigate: click de tab ──
+const _origNavigate = window.navigate;
+window.navigate = function(id, btn) {
+    _AG.sounds.nav();
+    _AG.vib.nav();
+    if (btn) {
+        btn.classList.add('ag-nav-pop');
+        setTimeout(() => btn.classList.remove('ag-nav-pop'), 320);
+    }
+    _origNavigate.call(this, id, btn);
+};
+
+// ── 5. Kit cargado ──
+// Interceptar showToast para detectar mensajes de kit
+const _origShowToast = window.showToast;
+window.showToast = function(msg, type) {
+    _origShowToast.call(this, msg, type);
+    if (typeof msg === 'string') {
+        const upper = msg.toUpperCase();
+        if (upper.includes('KIT') && upper.includes('CARGADO')) {
+            _AG.sounds.kit();
+            _AG.vib.kit();
+        } else if (upper.includes('TICKET') || upper.includes('GENERADO') || upper.includes('ACTUALIZADO')) {
+            // ya manejado en saveAndShow — skip
+        } else if (type === 'error' || upper.includes('ERROR') || upper.includes('INVALIDO')) {
+            _AG.sounds.error();
+            _AG.vib.error();
+        }
+    }
+};
+
+// ── 6. Botones primarios (.btn-main) — ripple al tocar ──
+document.addEventListener('pointerdown', function(e) {
+    const btn = e.target.closest('.btn-main, .btn-mini, .fab-btn');
+    if (btn && !btn.closest('#modal-invoice')) {
+        _AG.ripple(btn, e);
+    }
+}, { passive: true });
+
+// ── 7. Nav bar — ripple también en nav-btn ──
+document.addEventListener('click', function(e) {
+    const nb = e.target.closest('.nav-btn');
+    if (nb) _AG.ripple(nb, e);
+}, { passive: true });
+
+// ── 8. Desbloquear AudioContext en el primer toque de usuario ──
+// (política autoplay requiere interacción humana antes de producir audio)
+function _agUnlock() {
+    const c = window.AudioContext || window.webkitAudioContext;
+    if (c) {
+        const tmp = new c();
+        tmp.resume().then(() => tmp.close());
+    }
+    document.removeEventListener('touchstart', _agUnlock);
+    document.removeEventListener('pointerdown', _agUnlock);
+}
+document.addEventListener('touchstart',  _agUnlock, { once: true, passive: true });
+document.addEventListener('pointerdown', _agUnlock, { once: true, passive: true });
+</script>
+
 </body>
 </html>
