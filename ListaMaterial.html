@@ -2395,6 +2395,17 @@
 <!-- ── SPLASH INTRO (animado, visible mientras Firebase verifica sesión) ── -->
 <div id="splash-screen">
 <style>
+/* ═══════════════════════════════════════════════════════════
+   SPLASH — continuidad perfecta con el splash del sistema
+   
+   Estrategia:
+   1. Fondo idéntico al manifest (#111827) → sin salto de color
+   2. Ícono estático al inicio → igual que el PNG del sistema
+   3. Ícono "despierta": sube ligeramente y cobra glow/shimmer
+   4. Textos y barra entran desde abajo → pantalla completa
+   5. Fade-out suave al terminar la carga
+═══════════════════════════════════════════════════════════ */
+
 #splash-screen {
     position: fixed;
     inset: 0;
@@ -2404,241 +2415,223 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0;
     overflow: hidden;
 }
-/* Fondo con gradientes radiales igual que la app */
+
+/* Gradientes — aparecen con delay para no romper la continuidad */
 #splash-screen::before {
     content: '';
     position: absolute;
     inset: 0;
     background:
-        radial-gradient(ellipse 90% 70% at 15% 5%,  rgba(59,91,219,0.22) 0%, transparent 55%),
-        radial-gradient(ellipse 70% 60% at 85% 95%, rgba(30,60,160,0.16) 0%, transparent 55%),
-        radial-gradient(ellipse 50% 40% at 50% 50%, rgba(20,40,100,0.12) 0%, transparent 70%);
+        radial-gradient(ellipse 100% 80% at 10% 0%,   rgba(59,91,219,0.20) 0%, transparent 50%),
+        radial-gradient(ellipse 80%  70% at 90% 100%,  rgba(30,60,160,0.14) 0%, transparent 50%);
     pointer-events: none;
+    opacity: 0;
+    animation: spl-fade-in 0.8s ease 0.5s forwards;
 }
-/* ── Líneas de cuadrícula estilo aluminio/industria ── */
+/* Cuadrícula industrial */
 #splash-screen::after {
     content: '';
     position: absolute;
     inset: 0;
     background-image:
-        linear-gradient(rgba(59,91,219,0.06) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(59,91,219,0.06) 1px, transparent 1px);
-    background-size: 40px 40px;
+        linear-gradient(rgba(59,91,219,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59,91,219,0.05) 1px, transparent 1px);
+    background-size: 44px 44px;
     pointer-events: none;
-    animation: gridFadeIn 0.8s ease 0.1s both;
+    opacity: 0;
+    animation: spl-fade-in 1s ease 0.6s forwards;
 }
-@keyframes gridFadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
+@keyframes spl-fade-in { to { opacity: 1; } }
+
+/* ── Contenedor que sube el ícono para dejar espacio a los textos ── */
+.spl-icon-wrap {
+    /* Posición inicial: ícono centrado igual que el splash del sistema */
+    /* Se mueve 40px arriba al "despertar" para hacer sitio al texto */
+    transform: translateY(0);
+    animation: spl-icon-rise 0.55s cubic-bezier(0.34, 1.4, 0.64, 1) 0.35s forwards;
+}
+@keyframes spl-icon-rise {
+    to { transform: translateY(-44px); }
 }
 
-/* ── Contenedor del logo ── */
-.splash-logo-wrap {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
-    animation: splashLogoIn 0.55s cubic-bezier(0.22, 0.68, 0, 1.15) 0.15s both;
-}
-@keyframes splashLogoIn {
-    from { opacity: 0; transform: scale(0.72) translateY(16px); }
-    to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-/* ── Ícono glassmorphism ── */
-.splash-icon {
-    width: 88px;
-    height: 88px;
-    border-radius: 22px;
-    background: linear-gradient(145deg, rgba(59,91,219,0.9) 0%, rgba(35,60,180,0.95) 100%);
-    border: 1px solid rgba(100,140,255,0.35);
-    box-shadow:
-        0 0 0 1px rgba(59,91,219,0.3),
-        0 8px 32px rgba(59,91,219,0.45),
-        0 2px 8px rgba(0,0,0,0.4),
-        inset 0 1px 0 rgba(255,255,255,0.18);
+/* ── Ícono — sin entrada animada, aparece en su lugar ── */
+.spl-icon {
+    width: 90px;
+    height: 90px;
+    border-radius: 20px;          /* mismo ratio ~22% que el PNG generado */
+    background: #3b5bdb;          /* idéntico al PNG: sin gradiente inicial */
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
     overflow: hidden;
+    /* Cobra vida junto con el movimiento */
+    animation: spl-icon-awaken 0.55s ease 0.35s forwards;
 }
-/* Brillo superior del ícono */
-.splash-icon::before {
+@keyframes spl-icon-awaken {
+    from {
+        box-shadow: none;
+        background: #3b5bdb;
+    }
+    to {
+        box-shadow:
+            0 0 0 1px rgba(80,120,255,0.4),
+            0 0 32px rgba(59,91,219,0.6),
+            0 0 70px rgba(59,91,219,0.22),
+            0 8px 24px rgba(0,0,0,0.4),
+            inset 0 1px 0 rgba(255,255,255,0.16);
+        background: linear-gradient(145deg, #4a6ee0 0%, #3b5bdb 60%, #2f4ac2 100%);
+    }
+}
+
+/* Brillo superior */
+.spl-icon::before {
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0;
-    height: 45%;
-    background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, transparent 100%);
-    border-radius: 22px 22px 0 0;
+    height: 46%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 100%);
+    border-radius: 20px 20px 0 0;
+    opacity: 0;
+    animation: spl-fade-in 0.4s ease 0.45s forwards;
 }
-/* Shimmer de carga sobre el ícono */
-.splash-icon::after {
+
+/* Shimmer — una sola pasada */
+.spl-icon::after {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(105deg,
-        transparent 25%,
-        rgba(255,255,255,0.18) 50%,
-        transparent 75%);
-    background-size: 200% 100%;
-    animation: splashShimmer 1.6s ease 0.4s infinite;
-    border-radius: 22px;
+    background: linear-gradient(110deg,
+        transparent 20%,
+        rgba(255,255,255,0.25) 50%,
+        transparent 80%);
+    background-size: 300% 100%;
+    background-position: 300% 0;
+    animation: spl-shimmer 0.7s ease 0.8s forwards;
 }
-@keyframes splashShimmer {
-    0%   { background-position: 200% 0; opacity: 0; }
-    20%  { opacity: 1; }
-    80%  { opacity: 1; }
-    100% { background-position: -200% 0; opacity: 0; }
+@keyframes spl-shimmer {
+    from { background-position: 300% 0; }
+    to   { background-position: -300% 0; }
 }
 
-/* ── Letras AG dentro del ícono ── */
-.splash-ag {
-    font-family: 'DM Sans', system-ui, sans-serif;
+/* ── Letras AG — sin animación, presentes desde el inicio ── */
+.spl-ag {
+    font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
     font-weight: 800;
-    font-size: 30px;
+    font-size: 31px;
     letter-spacing: -1px;
     color: #fff;
     position: relative;
     z-index: 1;
     line-height: 1;
-    text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    user-select: none;
 }
 
-/* ── Texto de nombre de app ── */
-.splash-title {
-    font-family: 'DM Sans', system-ui, sans-serif;
+/* ── Textos — entran desde abajo después del shimmer ── */
+.spl-texts {
+    position: absolute;
+    /* Centrado horizontal, posicionado debajo del ícono una vez que sube */
+    top: 50%;
+    left: 0; right: 0;
+    margin-top: 14px;           /* gap entre ícono y texto */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    opacity: 0;
+    transform: translateY(14px);
+    animation: spl-texts-in 0.5s cubic-bezier(0.22, 0.68, 0, 1.1) 1.1s forwards;
+}
+@keyframes spl-texts-in {
+    to { opacity: 1; transform: translateY(0); }
+}
+.spl-title {
+    font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
     font-weight: 800;
-    font-size: 26px;
-    letter-spacing: -0.5px;
+    font-size: 25px;
+    letter-spacing: -0.4px;
     color: #e8eeff;
     line-height: 1;
-    animation: splashTitleIn 0.45s ease 0.45s both;
 }
-@keyframes splashTitleIn {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-
-.splash-subtitle {
-    font-family: 'DM Sans', system-ui, sans-serif;
+.spl-sub {
+    font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
     font-weight: 400;
-    font-size: 13px;
-    letter-spacing: 2.5px;
+    font-size: 11.5px;
+    letter-spacing: 3px;
     text-transform: uppercase;
     color: #4a6aaa;
-    margin-top: 4px;
-    animation: splashSubIn 0.45s ease 0.6s both;
-}
-@keyframes splashSubIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ── Barra de progreso ── */
-.splash-progress-track {
-    position: relative;
-    z-index: 1;
-    width: 120px;
+.spl-bar-track {
+    position: absolute;
+    bottom: 25%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 110px;
     height: 2px;
-    background: rgba(59,91,219,0.2);
+    background: rgba(59,91,219,0.18);
     border-radius: 2px;
-    margin-top: 36px;
     overflow: hidden;
-    animation: splashBarAppear 0.3s ease 0.7s both;
+    opacity: 0;
+    animation: spl-fade-in 0.3s ease 1.4s forwards;
 }
-@keyframes splashBarAppear {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-.splash-progress-fill {
+.spl-bar-fill {
     height: 100%;
-    width: 0%;
+    width: 0;
     background: linear-gradient(90deg, #3b5bdb, #7c9dff);
     border-radius: 2px;
-    box-shadow: 0 0 8px rgba(124,157,255,0.6);
-    animation: splashProgressRun 1.8s cubic-bezier(0.4, 0, 0.2, 1) 0.8s both;
+    box-shadow: 0 0 10px rgba(124,157,255,0.55);
+    animation: spl-progress 2.2s cubic-bezier(0.4,0,0.2,1) 1.45s both;
 }
-@keyframes splashProgressRun {
+@keyframes spl-progress {
     0%   { width: 0%; }
-    40%  { width: 55%; }
-    70%  { width: 78%; }
-    100% { width: 95%; }
+    30%  { width: 45%; }
+    60%  { width: 72%; }
+    100% { width: 93%; }
 }
 
-/* ── Tres puntos "cargando" ── */
-.splash-dots {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    gap: 6px;
-    margin-top: 18px;
-    animation: splashDotsAppear 0.3s ease 0.9s both;
-}
-@keyframes splashDotsAppear {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-.splash-dots span {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: #3b5bdb;
-    animation: splashDotPulse 1.2s ease-in-out infinite;
-}
-.splash-dots span:nth-child(1) { animation-delay: 0s; }
-.splash-dots span:nth-child(2) { animation-delay: 0.2s; }
-.splash-dots span:nth-child(3) { animation-delay: 0.4s; }
-@keyframes splashDotPulse {
-    0%, 80%, 100% { transform: scale(0.7); opacity: 0.35; }
-    40%            { transform: scale(1.2); opacity: 1; background: #7c9dff; }
-}
-
-/* ── Versión abajo ── */
-.splash-version {
+/* ── Versión ── */
+.spl-version {
     position: absolute;
-    bottom: 28px;
+    bottom: 26px;
     left: 0; right: 0;
     text-align: center;
     font-family: 'DM Sans', system-ui, sans-serif;
-    font-size: 11px;
-    letter-spacing: 1.5px;
+    font-size: 10.5px;
+    letter-spacing: 2px;
     text-transform: uppercase;
-    color: rgba(74,106,170,0.6);
-    animation: splashSubIn 0.4s ease 1s both;
+    color: rgba(74,106,170,0.45);
+    opacity: 0;
+    animation: spl-fade-in 0.4s ease 1.5s forwards;
 }
 
-/* ── Fade-out al terminar ── */
+/* ── Fade-out al terminar la carga ── */
 #splash-screen.splash-exit {
-    animation: splashFadeOut 0.38s cubic-bezier(0.4, 0, 1, 1) forwards;
+    animation: spl-exit 0.38s ease forwards;
+    pointer-events: none;
 }
-@keyframes splashFadeOut {
-    from { opacity: 1; transform: scale(1); }
-    to   { opacity: 0; transform: scale(1.03); pointer-events: none; }
+@keyframes spl-exit {
+    from { opacity: 1; }
+    to   { opacity: 0; }
 }
 </style>
 
-<div class="splash-logo-wrap">
-    <div class="splash-icon">
-        <span class="splash-ag">AG</span>
-    </div>
-    <div>
-        <div class="splash-title">AluGest Pro</div>
-        <div class="splash-subtitle">Gestión de cancelería</div>
+<div class="spl-icon-wrap">
+    <div class="spl-icon">
+        <span class="spl-ag">AG</span>
     </div>
 </div>
-<div class="splash-progress-track">
-    <div class="splash-progress-fill"></div>
+<div class="spl-texts">
+    <div class="spl-title">AluGest Pro</div>
+    <div class="spl-sub">Gestión de cancelería</div>
 </div>
-<div class="splash-dots">
-    <span></span><span></span><span></span>
+<div class="spl-bar-track">
+    <div class="spl-bar-fill"></div>
 </div>
-<div class="splash-version">v2025</div>
+<div class="spl-version">v2025</div>
 </div>
 
 <!-- ── PANTALLA DE LOGIN ── -->
