@@ -6497,7 +6497,7 @@ async function adminVerDetalle(tipo) {
         return;
     }
     // Para sesiones, cotizacion, busqueda → ir al panel eventos con filtro directo
-    const filtroMap = { cotizacion: 'cotizacion', busqueda: 'busqueda' };
+    const filtroMap = { sesiones: 'sesiones', cotizacion: 'cotizacion', busqueda: 'busqueda' };
     const filtro = filtroMap[tipo] || 'todos';
     // Navegar al panel sin resetear el cache
     ['dashboard','usuarios','eventos','mensajes'].forEach(t => {
@@ -6518,14 +6518,10 @@ async function adminVerDetalle(tipo) {
 }
 
 function adminVolverDashboard() {
+    // Si estamos en detalle de usuario, volver a lista de usuarios
     const detalle = document.getElementById('apanel-usuario-detalle');
-    const usuarios = document.getElementById('apanel-usuarios');
     if (detalle && detalle.style.display !== 'none') {
-        // Desde detalle → volver a lista usuarios
         adminTab('usuarios');
-    } else if (usuarios && usuarios.style.display !== 'none') {
-        // Desde lista usuarios → volver al dashboard
-        adminTab('dashboard');
     } else {
         adminTab('dashboard');
     }
@@ -6743,7 +6739,7 @@ function adminFiltrarEventos(tipo) {
     _adminEventosUsuario = ''; // reset usuario al cambiar tipo
     const sel = document.getElementById('admin-eventos-usuario-sel');
     if (sel) sel.value = '';
-    ['todos','cotizacion','busqueda','kit_cargado','producto_agregado','pedido_guardado'].forEach(t => {
+    ['todos','sesiones','cotizacion','busqueda','kit_cargado','producto_agregado','pedido_guardado'].forEach(t => {
         const id = t === 'kit_cargado' ? 'efil-kit' : t === 'producto_agregado' ? 'efil-producto' : t === 'pedido_guardado' ? 'efil-pedido' : 'efil-' + t;
         const btn = document.getElementById(id);
         if (btn) btn.classList.toggle('active', t === tipo);
@@ -6763,7 +6759,7 @@ function adminLimpiarVistaEventos() {
     _adminEventosUsuario = '';
     const sel = document.getElementById('admin-eventos-usuario-sel');
     if (sel) sel.value = '';
-    ['todos','cotizacion','busqueda','efil-kit','efil-producto'].forEach(id => {
+    ['todos','sesiones','cotizacion','busqueda','efil-kit','efil-producto'].forEach(id => {
         const btn = document.getElementById(id.startsWith('efil-') ? id : 'efil-' + id);
         if (btn) btn.classList.toggle('active', id === 'todos');
     });
@@ -6822,10 +6818,89 @@ function adminRenderEventosFiltrados() {
     // Si no hay filtro activo, usar 'todos' por defecto
     if (!_adminEventosFiltro) _adminEventosFiltro = 'todos';
 
+    // Cancelar listener de sesiones si cambiamos a otro filtro
+    if (_adminEventosFiltro !== 'sesiones' && window._sesionesUnsub) {
+        window._sesionesUnsub(); window._sesionesUnsub = null;
+    }
+
     const labels = { 'busqueda':'🔍','kit_cargado':'📦','cotizacion':'💰','ventas':'🛒','pedidos':'📋','comparar':'⚖️','config':'⚙️','producto_agregado':'➕','vidrio':'🪟','pedido_guardado':'🧾' };
 
     // Texto del filtro de búsqueda
-    const textoBusq = (document.getElementById('admin-eventos-search')?.value || '').toLowerCase().trim();    // ── Filtros normales desde eventos_global ──
+    const textoBusq = (document.getElementById('admin-eventos-search')?.value || '').toLowerCase().trim();
+
+    // ── Filtro SESIONES: muestra quién inició sesión y cuánto tiempo estuvo ──
+    if (_adminEventosFiltro === 'sesiones') {
+        el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando sesiones...</div>`;
+
+        // Cancelar listener anterior si existe
+        if (window._sesionesUnsub) { window._sesionesUnsub(); window._sesionesUnsub = null; }
+
+        const hace30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        // onSnapshot → actualización en tiempo real sin recargar
+        window._sesionesUnsub = _db.collection('sesiones')
+            .where('inicio','>',hace30).orderBy('inicio','desc').limit(100)
+            .onSnapshot(snap => {
+                const elNow = document.getElementById('admin-eventos-list');
+                const counterNow = document.getElementById('admin-eventos-counter');
+                // Si el filtro ya cambió, cancelar el listener y salir
+                if (_adminEventosFiltro !== 'sesiones') {
+                    if (window._sesionesUnsub) { window._sesionesUnsub(); window._sesionesUnsub = null; }
+                    return;
+                }
+                // Umbral: si ultimaActividad hace más de 5 min → considerar inactivo
+                const INACTIVO_MS = 5 * 60 * 1000;
+                const ahora = Date.now();
+                let sesiones = snap.docs.map(d => d.data()).filter(d => d.email !== ADMIN_EMAIL);
+                // Aplicar filtro de texto
+                const textoAct = (document.getElementById('admin-eventos-search')?.value || '').toLowerCase().trim();
+                if (textoAct) {
+                    sesiones = sesiones.filter(s =>
+                        (s.nombre||'').toLowerCase().includes(textoAct) ||
+                        (s.email||'').toLowerCase().includes(textoAct)
+                    );
+                }
+                if (counterNow) counterNow.textContent = sesiones.length ? `${sesiones.length} SESIÓN${sesiones.length!==1?'ES':''}` : '';
+                if (!sesiones.length) {
+                    if (elNow) elNow.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">${textoAct ? 'Sin coincidencias' : 'Sin sesiones registradas'}</div>`;
+                    return;
+                }
+                const html = sesiones.map(s => {
+                    const ds = s.duracionSegundos;
+                    // Determinar si realmente sigue activo: activo==true Y ultimaActividad reciente
+                    const ultimaAct = s.ultimaActividad || s.inicio;
+                    const realmenteActivo = s.activo && (ahora - ultimaAct) < INACTIVO_MS;
+                    let dur, durColor;
+                    if (ds) {
+                        dur = ds < 60 ? `${ds}s` : ds < 3600 ? `${Math.round(ds/60)} min` : `${Math.floor(ds/3600)}h ${Math.round((ds%3600)/60)}min`;
+                        durColor = 'var(--accent)';
+                    } else if (realmenteActivo) {
+                        const minActivo = Math.round((ahora - s.inicio) / 60000);
+                        dur = `🟢 En línea · ${minActivo < 60 ? minActivo + ' min' : Math.floor(minActivo/60) + 'h ' + (minActivo%60) + 'm'}`;
+                        durColor = 'var(--success)';
+                    } else {
+                        // activo==true pero sin actividad reciente → sesión huérfana
+                        const minDesde = Math.round((ahora - ultimaAct) / 60000);
+                        dur = minDesde < 60 ? `Inactivo ${minDesde} min` : `Inactivo ${Math.floor(minDesde/60)}h`;
+                        durColor = 'var(--warning)';
+                    }
+                    const fecha = new Date(s.inicio).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+                    return `<div class="card" style="margin-bottom:6px;padding:10px 12px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+                            <span style="font-size:14px;font-weight:700;color:var(--text)">👤 ${s.nombre||s.email}</span>
+                            <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:${durColor}">${dur}</span>
+                        </div>
+                        <div style="font-family:var(--mono);font-size:10px;color:var(--text3)">${fecha}</div>
+                    </div>`;
+                }).join('');
+                if (elNow) elNow.innerHTML = html;
+            }, () => {
+                const elErr = document.getElementById('admin-eventos-list');
+                if (elErr) elErr.innerHTML = `<div class="card" style="color:var(--danger);font-size:12px;padding:14px">Error cargando sesiones</div>`;
+            });
+        return;
+    }
+
+    // ── Filtros normales desde eventos_global ──
     let lista = _adminEventosFiltro === 'todos'
         ? _adminEventosCache.filter(e => ['busqueda','kit_cargado','cotizacion','producto_agregado','pedido_guardado'].includes(e.tipo))
         : _adminEventosCache.filter(e => e.tipo === _adminEventosFiltro);
@@ -7101,10 +7176,9 @@ async function adminCargarListaUsuarios() {
         el.innerHTML = usuarios.map(u => {
             const slist = sesMap[u.uid] || [];
             const ultima = slist[0];
+            // displayName es el campo guardado en usuarios; nombre viene de sesiones
             const nombreMostrar = u.displayName || (ultima ? ultima.nombre : null) || u.email || u.uid;
             const emailMostrar  = u.email || (ultima ? ultima.email : '');
-            const primerNombre  = (nombreMostrar||'').trim().split(' ')[0];
-            const iconoU = /a$/i.test(primerNombre) ? '👩' : '👨';
             const estaOnline = ultima && ultima.activo && (ahora - (ultima.ultimaActividad||ultima.inicio)) < INACT;
             const totalSes = slist.length;
             const ultimaFecha = ultima ? new Date(ultima.inicio).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : 'Sin sesiones';
@@ -7112,17 +7186,14 @@ async function adminCargarListaUsuarios() {
             return `<div class="card" onclick="adminVerUsuario('${uid}')"
                 style="margin-bottom:8px;padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;transition:transform .12s,box-shadow .12s"
                 onpointerdown="this.style.transform='scale(.98)'" onpointerup="this.style.transform=''" onpointercancel="this.style.transform=''">
-                <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
-                    <div style="position:relative;flex-shrink:0">
-                        <span style="font-size:30px;line-height:1">${iconoU}</span>
-                        ${estaOnline ? '<span style="position:absolute;bottom:0;right:-2px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--panel);box-shadow:0 0 0 1px rgba(22,163,74,0.3);animation:pulse 2s infinite"></span>' : ''}
+                <div style="flex:1;min-width:0">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+                        ${estaOnline ? '<span style="width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0;box-shadow:0 0 0 2px rgba(22,163,74,0.25);animation:pulse 2s infinite"></span>' : '<span style="width:8px;height:8px;border-radius:50%;background:var(--surface3);flex-shrink:0"></span>'}
+                        <span style="font-weight:700;font-size:15px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nombreMostrar}</span>
                     </div>
-                    <div style="flex:1;min-width:0">
-                        <div style="font-weight:700;font-size:15px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nombreMostrar}</div>
-                        <div style="font-size:10px;font-family:var(--mono);color:var(--text3)">${emailMostrar}</div>
-                        <div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">
-                            ${totalSes} sesión${totalSes!==1?'es':''} (30d) · última: ${ultimaFecha}
-                        </div>
+                    <div style="font-size:10px;font-family:var(--mono);color:var(--text3)">${emailMostrar}</div>
+                    <div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">
+                        ${totalSes} sesión${totalSes!==1?'es':''} (30d) · última: ${ultimaFecha}
                     </div>
                 </div>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
@@ -7187,7 +7258,7 @@ async function adminVerUsuario(uid) {
         const headerHTML = `
         <div class="card" style="margin-bottom:10px;padding:14px 16px">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-                <div style="width:44px;height:44px;border-radius:50%;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">${iconoGenero}</div>
+                <div style="width:44px;height:44px;border-radius:50%;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">👤</div>
                 <div style="flex:1;min-width:0">
                     <div style="font-size:17px;font-weight:800;color:var(--text)">${nombreMostrar}</div>
                     <div style="font-size:11px;font-family:var(--mono);color:var(--text3)">${emailMostrar}</div>
@@ -7216,35 +7287,16 @@ async function adminVerUsuario(uid) {
 
         // Sesiones con detalle expandible
         const sesionesFiltradas = sesiones.filter(s => s.email !== ADMIN_EMAIL);
-
-        // Detectar género por nombre (heurística simple en español)
-        const terminaFemenino = /a$/i.test((nombreMostrar||'').trim().split(' ')[0]);
-        const iconoGenero = terminaFemenino ? '👩' : '👨';
-
         const sesionesHTML = sesionesFiltradas.length ? `
         <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;margin-bottom:8px">HISTORIAL DE SESIONES</div>
         ${sesionesFiltradas.map((s, idx) => {
             const ds = s.duracionSegundos||0;
             const ultimaAct = s.ultimaActividad||s.inicio;
             const realOnline = s.activo && (ahora-ultimaAct)<INACT;
-            const esElUltimo = idx === 0; // ya ordenados desc, el primero es el más reciente
-
-            // Tiempo: solo en el último registro se muestra estado/inactividad
-            // En registros anteriores no se muestra nada (ya son historia cerrada)
-            let dur = '', durColor = 'var(--text3)';
-            if (esElUltimo) {
-                if (realOnline) {
-                    const minActivo = Math.round((ahora - s.inicio) / 60000);
-                    dur = `🟢 En línea · ${minActivo < 60 ? minActivo + ' min' : Math.floor(minActivo/60) + 'h ' + (minActivo%60) + 'm'}`;
-                    durColor = 'var(--success)';
-                } else {
-                    const minD = Math.round((ahora - ultimaAct) / 60000);
-                    if (minD < 60) dur = `Inactivo ${minD} min`;
-                    else if (minD < 1440) dur = `Inactivo ${Math.floor(minD/60)}h`;
-                    else dur = `Inactivo ${Math.floor(minD/1440)}d`;
-                    durColor = 'var(--warning)';
-                }
-            }
+            let dur, durColor;
+            if (realOnline) { dur='🟢 En línea'; durColor='var(--success)'; }
+            else if (ds>0) { dur = ds<60?`${ds}s`:ds<3600?`${Math.round(ds/60)} min`:`${Math.floor(ds/3600)}h ${Math.round((ds%3600)/60)}m`; durColor='var(--accent)'; }
+            else { const minD=Math.round((ahora-ultimaAct)/60000); dur=minD<60?`${minD} min`:`${Math.floor(minD/60)}h`; durColor='var(--text3)'; }
 
             const fecha = new Date(s.inicio).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
             const evUtiles = (s.eventos||[]).filter(ev=>TIPOS_UTILES_ADM.has(ev.tipo));
@@ -7266,28 +7318,25 @@ async function adminVerUsuario(uid) {
                 }).join('')
                 : `<div style="color:var(--text3);font-size:11px;font-family:var(--mono);padding:4px 0">Solo navegó por la app</div>`;
 
-            // sesId: usar _id de Firestore si existe; si no, marcar como no-borrable
-            const sesId = s._id || '';
-            const tieneBorrar = !!sesId;
-
+            const sesId = s._id || idx;
             return `<div class="card" style="margin-bottom:6px;padding:0;overflow:hidden">
-                <div style="display:flex;align-items:stretch">
-                    <div onclick="adminToggleSesDetalle('${sesId||idx}')"
+                <div style="display:flex;align-items:center">
+                    <div onclick="adminToggleSesDetalle('${sesId}')"
                         style="flex:1;padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px">
                         <div style="flex:1;min-width:0">
                             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
                                 <span style="font-weight:600;font-size:13px;color:var(--text)">${fecha}</span>
-                                ${dur ? `<span style="font-family:var(--mono);font-size:10px;font-weight:600;color:${durColor}">${dur}</span>` : ''}
+                                <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:${durColor}">${dur}</span>
                             </div>
                             ${funcUsadas.length ? `<div style="font-size:10px;color:var(--accent);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${funcUsadas.join(' · ')}</div>` : ''}
                         </div>
-                        <svg id="chev-${sesId||idx}" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2.5" style="flex-shrink:0;transition:transform 0.2s"><path d="M6 9l6 6 6-6"/></svg>
+                        <svg id="chev-${sesId}" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2.5" style="flex-shrink:0;transition:transform 0.2s"><path d="M6 9l6 6 6-6"/></svg>
                     </div>
-                    <button onclick="${tieneBorrar ? `adminBorrarSesion('${sesId}','${uid}')` : "showToast('ID no disponible','info')"}"
-                        style="background:none;border:none;padding:10px 12px;cursor:pointer;color:var(--danger);font-size:15px;flex-shrink:0;border-left:1px solid var(--border);display:flex;align-items:center"
+                    <button onclick="adminBorrarSesion('${s._id}','${uid}')"
+                        style="background:none;border:none;padding:10px 12px;cursor:pointer;color:var(--danger);font-size:16px;flex-shrink:0;border-left:1px solid var(--border)"
                         title="Borrar esta sesión">🗑</button>
                 </div>
-                <div id="sesdet-${sesId||idx}" style="display:none;padding:10px 12px;border-top:1px solid var(--border);background:var(--surface2)">
+                <div id="sesdet-${sesId}" style="display:none;padding:10px 12px;border-top:1px solid var(--border);background:var(--surface2)">
                     ${detalleHTML}
                 </div>
             </div>`;
@@ -7681,6 +7730,7 @@ init();
         <!-- Filtros de tipo -->
         <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
             <button onclick="adminFiltrarEventos('todos')" id="efil-todos" class="sub-tab-btn active" style="font-size:10px">Todos</button>
+            <button onclick="adminFiltrarEventos('sesiones')" id="efil-sesiones" class="sub-tab-btn" style="font-size:10px">👤 Sesiones</button>
             <button onclick="adminFiltrarEventos('cotizacion')" id="efil-cotizacion" class="sub-tab-btn" style="font-size:10px">💰 Cotizaciones</button>
             <button onclick="adminFiltrarEventos('busqueda')" id="efil-busqueda" class="sub-tab-btn" style="font-size:10px">🔍 Búsquedas</button>
             <button onclick="adminFiltrarEventos('kit_cargado')" id="efil-kit" class="sub-tab-btn" style="font-size:10px">📦 Kits</button>
