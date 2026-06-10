@@ -6471,22 +6471,23 @@ let _adminEventosUsuario = ''; // '' = todos los usuarios
 
 // ── Sub-tab navigation ──
 function adminTab(tab) {
-    ['dashboard','usuarios','eventos','mensajes'].forEach(t => {
+    const allPanels = ['dashboard','usuarios','usuario-detalle','eventos','mensajes'];
+    allPanels.forEach(t => {
         const panel = document.getElementById('apanel-' + t);
-        const btn   = document.getElementById('atab-' + t);
         if (panel) panel.style.display = t === tab ? '' : 'none';
-        if (btn)   btn.classList.toggle('active', t === tab);
     });
-    // Actualizar encabezado
+    ['dashboard','usuarios','eventos','mensajes'].forEach(t => {
+        const btn = document.getElementById('atab-' + t);
+        if (btn) btn.classList.toggle('active', t === tab || (tab === 'usuario-detalle' && t === 'usuarios'));
+    });
     const backBtn = document.getElementById('admin-back-btn');
     const titleEl = document.getElementById('admin-panel-title');
-    const titles  = { dashboard:'Panel Admin', usuarios:'Sesiones', eventos:'Eventos', mensajes:'Mensajes' };
+    const titles  = { dashboard:'Panel Admin', usuarios:'Usuarios', 'usuario-detalle':'Detalle', eventos:'Eventos', mensajes:'Mensajes' };
     if (backBtn) backBtn.style.display = tab === 'dashboard' ? 'none' : '';
     if (titleEl) titleEl.textContent = titles[tab] || 'Panel Admin';
-    if (tab === 'dashboard') adminCargarDashboard();
-    if (tab === 'usuarios')  { adminCargarOnline(); adminCargarActividad(); }
-    if (tab === 'eventos')   { _adminEventosCache = []; _adminEventosFiltro = 'todos'; _adminEventosUsuario = ''; adminCargarEventos(); }
-    if (tab === 'mensajes')  {} // sin carga especial
+    if (tab === 'dashboard')      adminCargarDashboard();
+    if (tab === 'usuarios')       adminCargarListaUsuarios();
+    if (tab === 'eventos')        { _adminEventosCache = []; _adminEventosFiltro = 'todos'; _adminEventosUsuario = ''; adminCargarEventos(); }
 }
 
 // Navega desde un KPI card a su detalle correspondiente
@@ -6517,7 +6518,13 @@ async function adminVerDetalle(tipo) {
 }
 
 function adminVolverDashboard() {
-    adminTab('dashboard');
+    // Si estamos en detalle de usuario, volver a lista de usuarios
+    const detalle = document.getElementById('apanel-usuario-detalle');
+    if (detalle && detalle.style.display !== 'none') {
+        adminTab('usuarios');
+    } else {
+        adminTab('dashboard');
+    }
 }
 
 // ── Dashboard principal ──
@@ -6537,14 +6544,16 @@ async function adminCargarDashboard() {
         const sesionesSnap = await _db.collection('sesiones')
             .where('inicio', '>', hace30).get();
         const sesiones = sesionesSnap.docs.map(d => d.data()).filter(d => d.email !== ADMIN_EMAIL);
-        const usuariosUnicos = new Set(sesiones.map(s => s.uid)).size;
         const cotizaciones = eventos.filter(e => e.tipo === 'cotizacion').length;
         const busquedas    = eventos.filter(e => e.tipo === 'busqueda').length;
+        // Contar usuarios registrados (excluyendo admin)
+        const usuariosSnap = await _db.collection('usuarios').get();
+        const totalUsuarios = usuariosSnap.docs.filter(d => d.data().email !== ADMIN_EMAIL).length;
 
         document.getElementById('kpi-sesiones').textContent     = sesiones.length;
         document.getElementById('kpi-cotizaciones').textContent  = cotizaciones;
         document.getElementById('kpi-busquedas').textContent     = busquedas;
-        document.getElementById('kpi-usuarios').textContent      = usuariosUnicos;
+        document.getElementById('kpi-usuarios').textContent      = totalUsuarios;
 
         // Gráfica circular por función
         adminRenderPieChart(eventos);
@@ -7084,140 +7093,305 @@ async function adminSendBroadcast() {
     } catch (e) { showToast('Error: ' + e.message, 'info'); }
 }
 
-function adminCargarOnline() {
-    if (!_fbIsAdmin) return;
-    _adminUnsubscribes.forEach(u => u());
-    _adminUnsubscribes = [];
-    const hace5min = Date.now() - 5 * 60 * 1000;
-    const unsub = _db.collection('sesiones')
-        .where('activo', '==', true).where('ultimaActividad', '>', hace5min)
-        .onSnapshot(snap => {
-            const el = document.getElementById('admin-online-list');
-            if (!el) return;
-            const docs = snap.docs.filter(d => d.data().email !== ADMIN_EMAIL);
-            const badge = document.getElementById('admin-badge');
-            if (!docs.length) {
-                el.innerHTML = `<div style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:12px 0">Ningún usuario conectado ahora</div>`;
-                if (badge) badge.style.display = 'none';
-                return;
-            }
-            if (badge) { badge.style.display = 'flex'; badge.textContent = docs.length; }
-            el.innerHTML = docs.map(d => {
-                const s = d.data();
-                const min = Math.round((Date.now() - s.inicio) / 60000);
-                const dur = min < 60 ? `${min} min` : `${Math.floor(min / 60)}h ${min % 60}m`;
-                return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
-                    <span style="width:9px;height:9px;border-radius:50%;background:#16a34a;flex-shrink:0;box-shadow:0 0 0 2px rgba(22,163,74,0.3);animation:pulse 2s infinite"></span>
-                    <div style="flex:1;min-width:0">
-                        <div style="font-weight:600;font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.nombre}</div>
-                        <div style="font-family:var(--mono);font-size:10px;color:var(--text3)">En línea · ${dur}</div>
-                    </div></div>`;
-            }).join('');
-        }, () => {});
-    _adminUnsubscribes.push(unsub);
-}
+// ══════════════════════════════════════════════
+//  GESTIÓN DE USUARIOS — nuevo sistema
+// ══════════════════════════════════════════════
 
-async function adminCargarActividad() {
+const TIPOS_UTILES_ADM = new Set(['busqueda','kit_cargado','cotizacion','ventas','pedidos','comparar','config','producto_agregado','vidrio','pedido_guardado']);
+const LABEL_EVENTO_ADM = {
+    'busqueda':'🔍 Búsqueda','kit_cargado':'📦 Kit cargado','cotizacion':'💰 Cotización',
+    'ventas':'🛒 Ventas','pedidos':'📋 Pedidos','comparar':'⚖️ Comparar',
+    'config':'⚙️ Config','producto_agregado':'➕ Producto agregado',
+    'vidrio':'🪟 Vidrio/Espejo','pedido_guardado':'🧾 Pedido guardado'
+};
+
+// ── Lista principal de usuarios registrados ──
+async function adminCargarListaUsuarios() {
     if (!_fbIsAdmin) return;
-    const el = document.getElementById('admin-activity-list');
+    const el = document.getElementById('admin-users-list');
+    const strip = document.getElementById('admin-online-strip');
     if (!el) return;
-    // ── FIX: ampliar a 30 días para ver todos los usuarios históricos ──
-    const hace30dias = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando...</div>`;
+
     try {
-        const snap = await _db.collection('sesiones').where('inicio', '>', hace30dias).orderBy('inicio', 'desc').limit(100).get();
-        const sesiones = snap.docs.map(d => d.data()).filter(d => d.email !== ADMIN_EMAIL);
-        if (!sesiones.length) {
-            el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Sin actividad en los últimos 30 días</div>`;
+        // Usuarios registrados (excluyendo admin)
+        const [usuSnap, sesSnap] = await Promise.all([
+            _db.collection('usuarios').get(),
+            _db.collection('sesiones').where('inicio','>',Date.now()-30*24*60*60*1000).orderBy('inicio','desc').limit(200).get()
+        ]);
+
+        const ahora = Date.now();
+        const INACT = 5 * 60 * 1000;
+
+        // Mapa uid → sesiones (últimas 30d)
+        const sesMap = {};
+        sesSnap.docs.forEach(d => {
+            const s = d.data();
+            if (s.email === ADMIN_EMAIL) return;
+            if (!sesMap[s.uid]) sesMap[s.uid] = [];
+            sesMap[s.uid].push({ ...s, _id: d.id });
+        });
+
+        // Usuarios en línea ahora
+        const enLinea = [];
+        Object.entries(sesMap).forEach(([uid, slist]) => {
+            const ultima = slist[0];
+            if (ultima && ultima.activo && (ahora - (ultima.ultimaActividad||ultima.inicio)) < INACT) {
+                enLinea.push(ultima);
+            }
+        });
+
+        // Strip en línea
+        if (strip) {
+            if (enLinea.length) {
+                strip.innerHTML = `<div class="card" style="background:rgba(22,163,74,0.08);border:1px solid rgba(22,163,74,0.25);padding:10px 12px;margin-bottom:10px">
+                    <div style="font-size:9px;font-family:var(--mono);color:var(--success);letter-spacing:1px;margin-bottom:6px">🟢 EN LÍNEA AHORA</div>
+                    ${enLinea.map(s=>`<div style="font-size:13px;font-weight:700;color:var(--text)">${s.nombre||s.email}</div>`).join('')}
+                </div>`;
+                const badge = document.getElementById('admin-badge');
+                if (badge) { badge.style.display='flex'; badge.textContent=enLinea.length; }
+            } else {
+                strip.innerHTML = '';
+                const badge = document.getElementById('admin-badge');
+                if (badge) badge.style.display='none';
+            }
+        }
+
+        const usuarios = usuSnap.docs.map(d => ({ uid: d.id, ...d.data() }))
+            .filter(u => u.email !== ADMIN_EMAIL);
+
+        if (!usuarios.length) {
+            el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Sin usuarios registrados</div>`;
             return;
         }
 
-        // ── TIPOS DE EVENTO ÚTILES (excluir navegación interna de pantallas) ──
-        const TIPOS_UTILES = new Set(['busqueda','kit_cargado','cotizacion','ventas','pedidos','comparar','config','producto_agregado','vidrio']);
-        const labelEvento = {
-            'busqueda': '🔍 Búsqueda',
-            'kit_cargado': '📦 Kit cargado',
-            'cotizacion': '💰 Cotización',
-            'ventas': '🛒 Ventas',
-            'pedidos': '📋 Pedidos',
-            'comparar': '⚖️ Comparar',
-            'config': '⚙️ Config',
-            'producto_agregado': '➕ Producto agregado',
-            'vidrio': '🪟 Vidrio/Espejo'
-        };
+        el.innerHTML = usuarios.map(u => {
+            const slist = sesMap[u.uid] || [];
+            const ultima = slist[0];
+            const estaOnline = ultima && ultima.activo && (ahora - (ultima.ultimaActividad||ultima.inicio)) < INACT;
+            const totalSes = slist.length;
+            const ultimaFecha = ultima ? new Date(ultima.inicio).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : 'Sin sesiones';
+            const uid = u.uid;
+            return `<div class="card" onclick="adminVerUsuario('${uid}')"
+                style="margin-bottom:8px;padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;transition:transform .12s,box-shadow .12s"
+                onpointerdown="this.style.transform='scale(.98)'" onpointerup="this.style.transform=''" onpointercancel="this.style.transform=''">
+                <div style="flex:1;min-width:0">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+                        ${estaOnline ? '<span style="width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0;box-shadow:0 0 0 2px rgba(22,163,74,0.25);animation:pulse 2s infinite"></span>' : '<span style="width:8px;height:8px;border-radius:50%;background:var(--surface3);flex-shrink:0"></span>'}
+                        <span style="font-weight:700;font-size:15px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u.nombre||u.email}</span>
+                    </div>
+                    <div style="font-size:10px;font-family:var(--mono);color:var(--text3)">${u.email||''}</div>
+                    <div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">
+                        ${totalSes} sesión${totalSes!==1?'es':''} (30d) · última: ${ultimaFecha}
+                    </div>
+                </div>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+            </div>`;
+        }).join('');
 
-        el.innerHTML = sesiones.map((s) => {
-            // Duración
-            const ds = s.duracionSegundos;
-            const _ahoraAct = Date.now();
-            const _ultimaAct = s.ultimaActividad || s.inicio;
-            const _realActivo = s.activo && (_ahoraAct - _ultimaAct) < 5 * 60 * 1000;
-            const dur = ds
-                ? (ds < 60 ? `${ds}s` : ds < 3600 ? `${Math.round(ds/60)} min` : `${Math.floor(ds/3600)}h ${Math.round((ds%3600)/60)}min`)
-                : (_realActivo ? '🟢 En línea' : '—');
+    } catch(e) {
+        el.innerHTML = `<div class="card" style="color:var(--danger);font-size:12px;padding:14px">Error: ${e.message}</div>`;
+    }
+}
 
-            // Fecha/hora de inicio
-            const fechaInicio = new Date(s.inicio).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+// ── Ver detalle de un usuario ──
+async function adminVerUsuario(uid) {
+    // Cambiar a panel detalle
+    const allPanels = ['dashboard','usuarios','usuario-detalle','eventos','mensajes'];
+    allPanels.forEach(t => {
+        const p = document.getElementById('apanel-' + t);
+        if (p) p.style.display = t === 'usuario-detalle' ? '' : 'none';
+    });
+    const backBtn = document.getElementById('admin-back-btn');
+    const titleEl = document.getElementById('admin-panel-title');
+    if (backBtn) { backBtn.style.display=''; backBtn.onclick = () => adminTab('usuarios'); }
 
-            // Filtrar solo eventos útiles (quitar screen-*)
-            const eventosUtiles = (s.eventos || []).filter(ev => TIPOS_UTILES.has(ev.tipo));
+    const el = document.getElementById('admin-user-detail-content');
+    if (!el) return;
+    el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:24px">Cargando...</div>`;
 
-            // Resumen de funciones usadas (sin duplicados)
-            const funcUsadas = [...new Set(eventosUtiles.map(e => labelEvento[e.tipo] || e.tipo))];
+    try {
+        const ahora = Date.now();
+        const INACT = 5 * 60 * 1000;
 
-            // Timeline de eventos útiles
-            const detalleHTML = eventosUtiles.length
-                ? eventosUtiles.map(ev => {
+        const [usuDoc, sesSnap, evSnap] = await Promise.all([
+            _db.collection('usuarios').doc(uid).get(),
+            _db.collection('sesiones').where('uid','==',uid).orderBy('inicio','desc').limit(60).get(),
+            _db.collection('eventos_global').where('uid','==',uid).orderBy('ts','desc').limit(200).get()
+        ]);
+
+        const u = usuDoc.exists ? { uid, ...usuDoc.data() } : { uid, nombre: uid, email: '' };
+        const sesiones = sesSnap.docs.map(d => ({ ...d.data(), _id: d.id }));
+        const eventos = evSnap.docs.map(d => ({ ...d.data(), _id: d.id }));
+
+        const ultimaSes = sesiones[0];
+        const estaOnline = ultimaSes && ultimaSes.activo && (ahora - (ultimaSes.ultimaActividad||ultimaSes.inicio)) < INACT;
+
+        if (titleEl) titleEl.textContent = u.nombre || 'Usuario';
+
+        // Calcular resumen
+        const totalMin = sesiones.reduce((acc, s) => acc + (s.duracionSegundos||0), 0);
+        const totalH = totalMin < 60 ? `${totalMin}s` : totalMin < 3600 ? `${Math.round(totalMin/60)} min` : `${Math.floor(totalMin/3600)}h ${Math.round((totalMin%3600)/60)}m`;
+        const tiposCnt = {};
+        eventos.forEach(e => { if (TIPOS_UTILES_ADM.has(e.tipo)) tiposCnt[e.tipo] = (tiposCnt[e.tipo]||0)+1; });
+        const topAcciones = Object.entries(tiposCnt).sort((a,b)=>b[1]-a[1]).slice(0,4);
+
+        // Encabezado de usuario
+        const headerHTML = `
+        <div class="card" style="margin-bottom:10px;padding:14px 16px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                <div style="width:44px;height:44px;border-radius:50%;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">👤</div>
+                <div style="flex:1;min-width:0">
+                    <div style="font-size:17px;font-weight:800;color:var(--text)">${u.nombre||'Sin nombre'}</div>
+                    <div style="font-size:11px;font-family:var(--mono);color:var(--text3)">${u.email||''}</div>
+                    ${estaOnline ? '<div style="font-size:11px;font-family:var(--mono);color:var(--success);margin-top:2px">🟢 En línea ahora</div>' : ''}
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+                <div style="text-align:center;background:var(--surface2);border-radius:10px;padding:8px 4px">
+                    <div style="font-size:18px;font-weight:800;color:var(--accent)">${sesiones.length}</div>
+                    <div style="font-size:9px;font-family:var(--mono);color:var(--text3)">SESIONES</div>
+                </div>
+                <div style="text-align:center;background:var(--surface2);border-radius:10px;padding:8px 4px">
+                    <div style="font-size:18px;font-weight:800;color:var(--warning)">${eventos.filter(e=>TIPOS_UTILES_ADM.has(e.tipo)).length}</div>
+                    <div style="font-size:9px;font-family:var(--mono);color:var(--text3)">ACCIONES</div>
+                </div>
+                <div style="text-align:center;background:var(--surface2);border-radius:10px;padding:8px 4px">
+                    <div style="font-size:14px;font-weight:800;color:var(--success)">${totalH}</div>
+                    <div style="font-size:9px;font-family:var(--mono);color:var(--text3)">TIEMPO</div>
+                </div>
+            </div>
+            ${topAcciones.length ? `<div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-bottom:4px;letter-spacing:.5px">MÁS USADO</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+                ${topAcciones.map(([tipo,cnt])=>`<span style="background:var(--accent-dim);color:var(--accent);border-radius:20px;padding:3px 10px;font-size:10px;font-family:var(--mono)">${LABEL_EVENTO_ADM[tipo]||tipo} ×${cnt}</span>`).join('')}
+            </div>` : ''}
+        </div>`;
+
+        // Sesiones con detalle expandible
+        const sesionesFiltradas = sesiones.filter(s => s.email !== ADMIN_EMAIL);
+        const sesionesHTML = sesionesFiltradas.length ? `
+        <div style="font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;margin-bottom:8px">HISTORIAL DE SESIONES</div>
+        ${sesionesFiltradas.map((s, idx) => {
+            const ds = s.duracionSegundos||0;
+            const ultimaAct = s.ultimaActividad||s.inicio;
+            const realOnline = s.activo && (ahora-ultimaAct)<INACT;
+            let dur, durColor;
+            if (realOnline) { dur='🟢 En línea'; durColor='var(--success)'; }
+            else if (ds>0) { dur = ds<60?`${ds}s`:ds<3600?`${Math.round(ds/60)} min`:`${Math.floor(ds/3600)}h ${Math.round((ds%3600)/60)}m`; durColor='var(--accent)'; }
+            else { const minD=Math.round((ahora-ultimaAct)/60000); dur=minD<60?`${minD} min`:`${Math.floor(minD/60)}h`; durColor='var(--text3)'; }
+
+            const fecha = new Date(s.inicio).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+            const evUtiles = (s.eventos||[]).filter(ev=>TIPOS_UTILES_ADM.has(ev.tipo));
+            const funcUsadas = [...new Set(evUtiles.map(e=>LABEL_EVENTO_ADM[e.tipo]||e.tipo))];
+
+            const detalleHTML = evUtiles.length
+                ? evUtiles.map(ev => {
                     const hora = new Date(ev.ts).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
-                    let desc = labelEvento[ev.tipo] || ev.tipo;
-                    // Detalle enriquecido por tipo
-                    if (ev.tipo === 'busqueda') {
-                        // Buscar producto seleccionado inmediatamente después en la sesión
-                        const idx = (s.eventos||[]).indexOf(ev);
-                        const siguiente = (s.eventos||[]).slice(idx+1, idx+4).find(x => x.tipo === 'producto_agregado');
-                        if (siguiente) {
-                            desc = `🔍 Buscó → seleccionó <strong>${siguiente.nombre||''}${siguiente.color?' '+siguiente.color:''}</strong>`;
-                        } else {
-                            desc = `🔍 Búsqueda: "${ev.detalle||''}"`;
-                        }
-                    } else if (ev.tipo === 'kit_cargado') {
-                        const colorKit = ev.color && ev.color !== '' ? ` · ${ev.color}` : '';
-                        desc = `📦 Kit: <strong>${ev.detalle||''}</strong>${colorKit}`;
-                    } else if (ev.tipo === 'cotizacion') {
-                        desc = `💰 Cotización <strong>${ev.cliente||'cliente'}</strong> · $${(ev.total||0).toLocaleString('es-MX',{maximumFractionDigits:0})} · ${ev.items||0} items`;
-                    } else if (ev.tipo === 'producto_agregado') {
-                        desc = `➕ Agregó: <strong>${ev.nombre||''}</strong>${ev.color?' ('+ev.color+')':''}`;
-                    }
-                    return `<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px;align-items:flex-start">
-                        <span style="color:var(--text3);font-family:var(--mono);min-width:44px;flex-shrink:0">${hora}</span>
+                    let desc = LABEL_EVENTO_ADM[ev.tipo]||ev.tipo;
+                    if (ev.tipo==='busqueda') desc=`🔍 Búsqueda: "${ev.detalle||''}"`;
+                    else if (ev.tipo==='kit_cargado') desc=`📦 Kit: <strong>${ev.detalle||''}</strong>${ev.color?` · ${ev.color}`:''}`;
+                    else if (ev.tipo==='cotizacion') desc=`💰 Cotización <strong>${ev.cliente||'cliente'}</strong> · $${(ev.total||0).toLocaleString('es-MX',{maximumFractionDigits:0})} · ${ev.items||0} items`;
+                    else if (ev.tipo==='producto_agregado') desc=`➕ <strong>${ev.nombre||''}</strong>${ev.color?` (${ev.color})`:''}`;
+                    else if (ev.tipo==='pedido_guardado') desc=`🧾 Pedido guardado: <strong>${ev.cliente||''}</strong>`;
+                    return `<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px;align-items:flex-start">
+                        <span style="color:var(--text3);font-family:var(--mono);min-width:42px;flex-shrink:0">${hora}</span>
                         <span style="color:var(--text2);line-height:1.4">${desc}</span>
                     </div>`;
                 }).join('')
-                : `<div style="color:var(--text3);font-size:11px;font-family:var(--mono);padding:6px 0">Solo navegó por la app</div>`;
+                : `<div style="color:var(--text3);font-size:11px;font-family:var(--mono);padding:4px 0">Solo navegó por la app</div>`;
 
+            const sesId = s._id || idx;
             return `<div class="card" style="margin-bottom:6px;padding:0;overflow:hidden">
-                <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'; this.querySelector('.adm-chev').style.transform=this.nextElementSibling.style.display==='block'?'rotate(180deg)':'rotate(0deg)'"
-                    style="padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px">
-                    <div style="flex:1;min-width:0">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
-                            <span style="font-weight:700;font-size:14px;color:var(--text)">${s.nombre||s.email}</span>
-                            <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:${s.activo?'var(--success)':'var(--text3)'}">${dur}</span>
+                <div style="display:flex;align-items:center">
+                    <div onclick="adminToggleSesDetalle('${sesId}')"
+                        style="flex:1;padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px">
+                        <div style="flex:1;min-width:0">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+                                <span style="font-weight:600;font-size:13px;color:var(--text)">${fecha}</span>
+                                <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:${durColor}">${dur}</span>
+                            </div>
+                            ${funcUsadas.length ? `<div style="font-size:10px;color:var(--accent);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${funcUsadas.join(' · ')}</div>` : ''}
                         </div>
-                        <div style="font-family:var(--mono);font-size:10px;color:var(--text3)">${fechaInicio}</div>
-                        ${funcUsadas.length ? `<div style="font-size:10px;color:var(--accent);font-family:var(--mono);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Usó: ${funcUsadas.join(', ')}</div>` : ''}
+                        <svg id="chev-${sesId}" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2.5" style="flex-shrink:0;transition:transform 0.2s"><path d="M6 9l6 6 6-6"/></svg>
                     </div>
-                    <svg class="adm-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;transition:transform 0.2s;color:var(--text3)"><path d="M6 9l6 6 6-6"/></svg>
+                    <button onclick="adminBorrarSesion('${s._id}','${uid}')"
+                        style="background:none;border:none;padding:10px 12px;cursor:pointer;color:var(--danger);font-size:16px;flex-shrink:0;border-left:1px solid var(--border)"
+                        title="Borrar esta sesión">🗑</button>
                 </div>
-                <div style="display:none;padding:10px 12px;border-top:1px solid var(--border);background:var(--surface2)">
-                    <div style="font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:1px;margin-bottom:6px">ACTIVIDAD EN LA SESIÓN</div>
+                <div id="sesdet-${sesId}" style="display:none;padding:10px 12px;border-top:1px solid var(--border);background:var(--surface2)">
                     ${detalleHTML}
-                    <div style="margin-top:8px;font-size:10px;font-family:var(--mono);color:var(--text3)">
-                        ${eventosUtiles.length} accion${eventosUtiles.length!==1?'es':''} · ${(s.eventos||[]).length} eventos totales
-                    </div>
                 </div>
             </div>`;
-        }).join('');
-    } catch (e) {
-        el.innerHTML = `<div class="card" style="color:var(--danger);font-size:12px;padding:14px">Error al cargar actividad: ${e.message}</div>`;
+        }).join('')}` : `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Sin sesiones registradas</div>`;
+
+        // Botón borrar todo
+        const borrarTodoHTML = `
+        <div style="margin-top:16px;padding:14px;background:rgba(220,38,38,0.06);border:1px solid rgba(220,38,38,0.2);border-radius:var(--radius-sm)">
+            <div style="font-size:11px;color:var(--danger);font-family:var(--mono);margin-bottom:8px;font-weight:700">⚠ ZONA PELIGROSA</div>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Borrar TODAS las sesiones y eventos de este usuario. Esto lo excluirá de todos los reportes. No se puede deshacer.</div>
+            <button onclick="adminBorrarUsuarioCompleto('${uid}','${u.nombre||u.email}')"
+                class="btn-main" style="margin:0;background:var(--danger);border-color:var(--danger);font-size:12px">
+                🗑 BORRAR TODOS SUS REGISTROS
+            </button>
+        </div>`;
+
+        el.innerHTML = headerHTML + sesionesHTML + borrarTodoHTML;
+
+    } catch(e) {
+        el.innerHTML = `<div class="card" style="color:var(--danger);font-size:12px;padding:14px">Error: ${e.message}</div>`;
+    }
+}
+
+function adminToggleSesDetalle(id) {
+    const el = document.getElementById('sesdet-' + id);
+    const chev = document.getElementById('chev-' + id);
+    if (!el) return;
+    const open = el.style.display !== 'none';
+    el.style.display = open ? 'none' : '';
+    if (chev) chev.style.transform = open ? '' : 'rotate(180deg)';
+}
+
+// ── Borrar una sesión individual ──
+async function adminBorrarSesion(sesionId, uid) {
+    if (!sesionId) { showToast('ID de sesión no disponible', 'info'); return; }
+    if (!confirm('¿Borrar esta sesión y sus eventos? No se puede deshacer.')) return;
+    try {
+        const batch = _db.batch();
+        // Borrar el documento de sesión
+        batch.delete(_db.collection('sesiones').doc(sesionId));
+        // Borrar eventos_global de este uid en esa sesión (por sessionId si existe)
+        // Intentamos borrar por sessionId primero
+        const evSnap = await _db.collection('eventos_global').where('sessionId','==',sesionId).get();
+        evSnap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        showToast('✓ Sesión eliminada', 'success');
+        adminVerUsuario(uid);
+    } catch(e) {
+        showToast('Error al borrar: ' + e.message, 'info');
+    }
+}
+
+// ── Borrar todos los registros de un usuario ──
+async function adminBorrarUsuarioCompleto(uid, nombre) {
+    if (!confirm(`¿Borrar TODAS las sesiones y eventos de "${nombre}"?\n\nEsto eliminará su historial completo de los reportes. No se puede deshacer.`)) return;
+    showToast('Borrando registros...', 'info');
+    try {
+        // Borrar sesiones
+        const sesSnap = await _db.collection('sesiones').where('uid','==',uid).get();
+        // Borrar eventos_global
+        const evSnap = await _db.collection('eventos_global').where('uid','==',uid).get();
+
+        // Borrar en batches de 500
+        const docsABorrar = [...sesSnap.docs, ...evSnap.docs];
+        for (let i = 0; i < docsABorrar.length; i += 400) {
+            const batch = _db.batch();
+            docsABorrar.slice(i, i+400).forEach(d => batch.delete(d.ref));
+            await batch.commit();
+        }
+        showToast(`✓ Registros de "${nombre}" eliminados`, 'success');
+        adminTab('usuarios');
+    } catch(e) {
+        showToast('Error al borrar: ' + e.message, 'info');
     }
 }
 
@@ -7421,12 +7595,7 @@ _auth.onAuthStateChanged(async (user) => {
                 escucharBroadcasts(user);
                 if (_fbIsAdmin) {
                     adminCargarDashboard();
-                    adminCargarOnline();
                     adminEscucharNotifs();
-                    // ── OPTIMIZACIÓN 2: Limpieza automática de datos viejos ──
-                    // Antes: solo se limpiaba manualmente desde el panel.
-                    // Ahora: se lanza sola al entrar como admin (silenciosa,
-                    //        no bloquea nada, límite 50/100 docs por run).
                     adminLimpiarDatos().catch(() => {});
                 }
             } catch (e) {
@@ -7504,7 +7673,7 @@ init();
             <div class="card" onclick="adminVerDetalle('sesiones')" style="padding:12px;text-align:center;cursor:pointer;transition:transform .15s,box-shadow .15s" onpointerdown="this.style.transform='scale(.96)'" onpointerup="this.style.transform=''" onpointercancel="this.style.transform=''"><div style="font-size:22px;font-weight:800;color:var(--accent)" id="kpi-sesiones">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">SESIONES 30d</div></div>
             <div class="card" onclick="adminVerDetalle('cotizacion')" style="padding:12px;text-align:center;cursor:pointer;transition:transform .15s,box-shadow .15s" onpointerdown="this.style.transform='scale(.96)'" onpointerup="this.style.transform=''" onpointercancel="this.style.transform=''"><div style="font-size:22px;font-weight:800;color:var(--success)" id="kpi-cotizaciones">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">COTIZACIONES</div></div>
             <div class="card" onclick="adminVerDetalle('busqueda')" style="padding:12px;text-align:center;cursor:pointer;transition:transform .15s,box-shadow .15s" onpointerdown="this.style.transform='scale(.96)'" onpointerup="this.style.transform=''" onpointercancel="this.style.transform=''"><div style="font-size:22px;font-weight:800;color:var(--warning)" id="kpi-busquedas">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">BÚSQUEDAS</div></div>
-            <div class="card" onclick="adminVerDetalle('usuarios')" style="padding:12px;text-align:center;cursor:pointer;transition:transform .15s,box-shadow .15s" onpointerdown="this.style.transform='scale(.96)'" onpointerup="this.style.transform=''" onpointercancel="this.style.transform=''"><div style="font-size:22px;font-weight:800;color:var(--info)" id="kpi-usuarios">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">USUARIOS ÚNICOS</div></div>
+            <div class="card" onclick="adminVerDetalle('usuarios')" style="padding:12px;text-align:center;cursor:pointer;transition:transform .15s,box-shadow .15s" onpointerdown="this.style.transform='scale(.96)'" onpointerup="this.style.transform=''" onpointercancel="this.style.transform=''"><div style="font-size:22px;font-weight:800;color:var(--info)" id="kpi-usuarios">—</div><div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">USUARIOS</div></div>
         </div>
         <!-- Actividad por día -->
         <div class="section-divider-label">ACTIVIDAD POR FUNCIÓN (30d)</div>
@@ -7517,21 +7686,25 @@ init();
         </div>
         <!-- Accesos secundarios -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:80px">
-            <button onclick="adminTab('usuarios')" class="btn-main ghost-btn" style="margin:0;font-size:11px;font-family:var(--mono);letter-spacing:.5px">👥 VER SESIONES</button>
+            <button onclick="adminTab('usuarios')" class="btn-main ghost-btn" style="margin:0;font-size:11px;font-family:var(--mono);letter-spacing:.5px">👥 VER USUARIOS</button>
             <button onclick="adminTab('mensajes')" class="btn-main ghost-btn" style="margin:0;font-size:11px;font-family:var(--mono);letter-spacing:.5px">📢 MENSAJES</button>
         </div>
     </div>
 
-    <!-- PANEL: USUARIOS -->
+    <!-- PANEL: USUARIOS — Vista lista -->
     <div id="apanel-usuarios" class="container" style="padding-top:12px;display:none">
-        <div class="section-divider-label">EN LÍNEA AHORA</div>
-        <div id="admin-online-list" class="card" style="padding:10px;min-height:60px;margin-bottom:12px">
-            <div style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:12px 0">Cargando...</div>
-        </div>
-        <div class="section-divider-label">SESIONES RECIENTES (30 días)</div>
-        <div id="admin-activity-list" style="min-height:60px;margin-bottom:80px">
+        <!-- En línea ahora (badge pequeño) -->
+        <div id="admin-online-strip" style="margin-bottom:10px"></div>
+        <!-- Lista de usuarios registrados -->
+        <div class="section-divider-label" style="margin-bottom:8px">USUARIOS REGISTRADOS</div>
+        <div id="admin-users-list" style="min-height:60px;margin-bottom:80px">
             <div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando...</div>
         </div>
+    </div>
+
+    <!-- PANEL: DETALLE DE USUARIO -->
+    <div id="apanel-usuario-detalle" class="container" style="padding-top:12px;display:none">
+        <div id="admin-user-detail-content" style="margin-bottom:80px"></div>
     </div>
 
     <!-- PANEL: EVENTOS -->
