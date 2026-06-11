@@ -7346,12 +7346,13 @@ async function adminCargarListaUsuarios() {
 
     try {
         const adminUid = _currentUser ? _currentUser.uid : null;
-        const hace30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        const hace30 = Date.now() - 30  * 24 * 60 * 60 * 1000;
+        const hace90 = Date.now() - 90  * 24 * 60 * 60 * 1000; // ampliar para recuperar usuarios sin doc
 
         // Sin orderBy → no requiere índice compuesto; ordenamos en cliente
         const [usuSnap, sesSnap] = await Promise.all([
             _db.collection('usuarios').get(),
-            _db.collection('sesiones').where('inicio', '>', hace30).limit(300).get()
+            _db.collection('sesiones').where('inicio', '>', hace90).limit(500).get()
         ]);
 
         const ahora = Date.now();
@@ -7367,6 +7368,12 @@ async function adminCargarListaUsuarios() {
         });
         // Ordenar sesiones de cada usuario por inicio desc
         Object.values(sesMap).forEach(arr => arr.sort((a,b) => b.inicio - a.inicio));
+        // sesMap30: filtrado a últimas 30d para el conteo de sesiones en tarjeta
+        const sesMap30 = {};
+        Object.entries(sesMap).forEach(([uid, arr]) => {
+            const r = arr.filter(s => s.inicio > hace30);
+            if (r.length) sesMap30[uid] = r;
+        });
 
         // Usuarios en línea ahora
         const enLinea = [];
@@ -7394,9 +7401,30 @@ async function adminCargarListaUsuarios() {
         }
 
         // Filtrar admin del listado (por email Y por uid)
-        const usuarios = usuSnap.docs
-            .map(d => ({ uid: d.id, ...d.data() }))
-            .filter(u => u.email !== ADMIN_EMAIL && u.uid !== adminUid);
+        const usuariosMap = {};
+        usuSnap.docs.forEach(d => {
+            const u = { uid: d.id, ...d.data() };
+            if (u.email === ADMIN_EMAIL || u.uid === adminUid) return;
+            usuariosMap[u.uid] = u;
+        });
+
+        // ── CORRECCIÓN: incluir usuarios que tienen sesiones pero NO tienen
+        //    documento en la colección 'usuarios' (entraron antes de que se
+        //    guardara su doc, o hubo un error al crearlo).
+        //    Se reconstruyen desde sus datos de sesión. ──
+        Object.entries(sesMap).forEach(([uid, slist]) => {
+            if (usuariosMap[uid]) return;          // ya está, no duplicar
+            const s = slist[0];                    // sesión más reciente
+            if (!s) return;
+            usuariosMap[uid] = {
+                uid,
+                email:       s.email       || '',
+                displayName: s.nombre      || s.displayName || '',
+                _soloSesion: true           // marcador interno (no se muestra)
+            };
+        });
+
+        const usuarios = Object.values(usuariosMap);
 
         if (!usuarios.length) {
             el.innerHTML = `<div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Sin usuarios registrados</div>`;
@@ -7405,13 +7433,14 @@ async function adminCargarListaUsuarios() {
 
         // Enriquecer con datos de sesión (nombre/email puede venir de sesiones si no está en usuarios)
         el.innerHTML = usuarios.map(u => {
-            const slist = sesMap[u.uid] || [];
-            const ultima = slist[0];
+            const slistAll = sesMap[u.uid]   || [];   // 90d → detectar usuarios
+            const slist30  = sesMap30[u.uid] || [];   // 30d → conteo tarjeta
+            const ultima = slistAll[0];
             // displayName es el campo guardado en usuarios; nombre viene de sesiones
             const nombreMostrar = u.displayName || (ultima ? ultima.nombre : null) || u.email || u.uid;
             const emailMostrar  = u.email || (ultima ? ultima.email : '');
             const estaOnline = ultima && ultima.activo && (ahora - (ultima.ultimaActividad||ultima.inicio)) < INACT;
-            const totalSes = slist.length;
+            const totalSes = slist30.length;   // solo sesiones recientes (30d)
             const ultimaFecha = ultima ? new Date(ultima.inicio).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : 'Sin sesiones';
             const uid = u.uid;
             return `<div class="card" onclick="adminVerUsuario('${uid}')"
