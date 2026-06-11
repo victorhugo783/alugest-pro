@@ -1,9 +1,14 @@
-// AluGest Pro — Service Worker v4
+// AluGest Pro — Service Worker v5
 // Estrategia: Network First con fallback a caché
 // Ciclo de vida: skipWaiting + clients.claim para activación inmediata
 
-const CACHE_NAME   = 'alugest-v4';
-const CACHE_ASSETS = ['./ListaMaterial.html', './manifest.json'];
+const CACHE_NAME   = 'alugest-v5';
+const CACHE_ASSETS = [
+    './ListaMaterial.html',
+    './manifest.json',
+    './icon-192.png',
+    './icon-512.png'
+];
 
 // ── INSTALL: cachear assets críticos y tomar control de inmediato ──
 self.addEventListener('install', (event) => {

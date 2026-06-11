@@ -102,6 +102,7 @@
             --shadow:      0 2px 8px rgba(0,0,0,0.4), 0 8px 32px rgba(0,0,0,0.3);
             --shadow-lg:   0 8px 40px rgba(0,0,0,0.55);
         }
+        /* ─── LIGHT MODE manual (idéntico al :root default — alias para toggleTheme) ─── */
         :root[data-theme="light"] {
             --bg:          #f5f6fa;
             --panel:       #ffffff;
@@ -3391,6 +3392,31 @@ function showToast(msg, type = 'success') {
     clearTimeout(t._to);
     t._to = setTimeout(() => { t.classList.remove('show'); }, 2400);
 }
+// ── _dialog: reemplaza confirm() nativo (falla en iOS PWA) ──────────────────
+// Uso: const ok = await _dialog('¿Seguro?');
+// Uso con botones custom: await _dialog('Mensaje', ['Opción A', 'Cancelar'])
+//   → resuelve con el texto del botón presionado, o null si se cierra.
+function _dialog(msg, btns) {
+    return new Promise(resolve => {
+        const buttons = btns || ['Aceptar', 'Cancelar'];
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+        const box = document.createElement('div');
+        box.style.cssText = 'background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-md);padding:22px 20px 16px;max-width:320px;width:100%;box-shadow:var(--shadow-lg);animation:popIn 0.22s cubic-bezier(.22,.68,0,1.12) both';
+        const lines = msg.split('\n').map(l => `<div style="margin-bottom:4px">${l}</div>`).join('');
+        box.innerHTML = `<div style="font-size:15px;color:var(--text);font-family:var(--font);line-height:1.55;margin-bottom:18px">${lines}</div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+            ${buttons.map((b,i) => `<button data-idx="${i}" style="padding:10px 18px;border-radius:var(--radius-sm);border:${i===0?'none':'1px solid var(--border2)'};background:${i===0?'var(--accent)':'var(--surface2)'};color:${i===0?'#fff':'var(--text2)'};font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;flex:1">${b}</button>`).join('')}
+        </div>`;
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+        const cleanup = val => { overlay.remove(); resolve(val); };
+        box.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => cleanup(btn.textContent));
+        });
+        overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(null); });
+    });
+}
 function normalizeText(text) { return (text || "").toString().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/n\u0303/g, "n").toUpperCase().trim(); }
 function toUpper(v) { return (v || '').trim().toUpperCase(); }
 function clearFieldError(inputId, errorId) { const i = document.getElementById(inputId); const w = i?.closest('.ghost-wrap'); if(w) w.classList.remove('invalid'); const e = document.getElementById(errorId); if(e) e.classList.remove('visible'); }
@@ -3558,8 +3584,26 @@ function getActiveCart() {
     const s = data.cartSections.find(x => x.id === _activeSectionId);
     return s || data;
 }
-function addSection() {
-    const name = prompt('Nombre de la sección (ej: Ventanas 3", Puertas):');
+async function addSection() {
+    const name = await new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+        overlay.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-md);padding:22px 20px 16px;max-width:320px;width:100%;box-shadow:var(--shadow-lg);animation:popIn 0.22s cubic-bezier(.22,.68,0,1.12) both">
+            <div style="font-size:15px;color:var(--text);font-family:var(--font);margin-bottom:12px">Nombre de la sección:</div>
+            <input id="_dlg_input" type="text" placeholder='Ej: Ventanas 3", Puertas' style="width:100%;padding:10px 14px;font-size:15px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;text-transform:uppercase;margin-bottom:14px">
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+                <button id="_dlg_cancel" style="padding:10px 18px;border-radius:var(--radius-sm);border:1px solid var(--border2);background:var(--surface2);color:var(--text2);font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;flex:1">Cancelar</button>
+                <button id="_dlg_ok" style="padding:10px 18px;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;flex:1">Crear</button>
+            </div>
+        </div>`;
+        document.body.appendChild(overlay);
+        const inp = overlay.querySelector('#_dlg_input');
+        inp.focus();
+        const done = val => { overlay.remove(); resolve(val); };
+        overlay.querySelector('#_dlg_ok').onclick = () => done(inp.value);
+        overlay.querySelector('#_dlg_cancel').onclick = () => done(null);
+        inp.addEventListener('keydown', e => { if (e.key === 'Enter') done(inp.value); if (e.key === 'Escape') done(null); });
+    });
     if (!name || !name.trim()) return;
     const s = { id: Date.now(), name: name.trim().toUpperCase(), cart: {}, lastAddedOrder: [], cartInsumos: [] };
     if (!data.cartSections) data.cartSections = [];
@@ -3570,10 +3614,11 @@ function addSection() {
     renderSelectedList();
     showToast(`✓ SECCIÓN "${s.name}" CREADA`, 'success');
 }
-function deleteSection(id) {
+async function deleteSection(id) {
     const s = data.cartSections.find(x => x.id === id);
     if (!s) return;
-    if (!confirm(`¿Eliminar la sección "${s.name}"?`)) return;
+    const ok = await _dialog(`¿Eliminar la sección "${s.name}"?`, ['Eliminar', 'Cancelar']);
+    if (!ok || ok === 'Cancelar') return;
     data.cartSections = data.cartSections.filter(x => x.id !== id);
     if (_activeSectionId === id) _activeSectionId = null;
     save();
@@ -3584,10 +3629,29 @@ function switchSection(id) {
     _activeSectionId = (id === null || id === 'null' || id === undefined) ? null : id;
     renderSelectedList();
 }
-function renameSection(id) {
+async function renameSection(id) {
     const s = data.cartSections.find(x => x.id === id);
     if (!s) return;
-    const name = prompt('Nuevo nombre:', s.name);
+    // Build a mini input dialog inline using _dialog's overlay pattern
+    const name = await new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)';
+        overlay.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-md);padding:22px 20px 16px;max-width:320px;width:100%;box-shadow:var(--shadow-lg);animation:popIn 0.22s cubic-bezier(.22,.68,0,1.12) both">
+            <div style="font-size:15px;color:var(--text);font-family:var(--font);margin-bottom:12px">Nuevo nombre para la sección:</div>
+            <input id="_dlg_input" type="text" value="${s.name}" style="width:100%;padding:10px 14px;font-size:15px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;text-transform:uppercase;margin-bottom:14px">
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+                <button id="_dlg_cancel" style="padding:10px 18px;border-radius:var(--radius-sm);border:1px solid var(--border2);background:var(--surface2);color:var(--text2);font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;flex:1">Cancelar</button>
+                <button id="_dlg_ok" style="padding:10px 18px;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;flex:1">Guardar</button>
+            </div>
+        </div>`;
+        document.body.appendChild(overlay);
+        const inp = overlay.querySelector('#_dlg_input');
+        inp.focus(); inp.select();
+        const done = val => { overlay.remove(); resolve(val); };
+        overlay.querySelector('#_dlg_ok').onclick = () => done(inp.value);
+        overlay.querySelector('#_dlg_cancel').onclick = () => done(null);
+        inp.addEventListener('keydown', e => { if (e.key === 'Enter') done(inp.value); if (e.key === 'Escape') done(null); });
+    });
     if (!name || !name.trim()) return;
     s.name = name.trim().toUpperCase();
     save();
@@ -3823,11 +3887,12 @@ function updateCartSubtotal() {
     const total = subtotal * IVA;
     const label = hasSections ? 'TOTAL CONSOLIDADO' : 'TOTAL';
     el.style.display = 'block';
-    el.innerHTML = buildSubtotalHTML(hasSections, subtotal, iva, false, 0, total, label, hasMissing);
+    // Pasar mergedCart calculado para evitar segunda llamada a getTotalAllSections dentro de buildSubtotalHTML
+    el.innerHTML = buildSubtotalHTML(hasSections, subtotal, iva, false, 0, total, label, hasMissing, mergedCart);
 }
-function buildSubtotalHTML(hasSections, subtotal, iva, installActive, installCost, total, label, hasMissing) {
-    // ── Category summary ──
-    const merged = getTotalAllSections();
+function buildSubtotalHTML(hasSections, subtotal, iva, installActive, installCost, total, label, hasMissing, _mergedCartArg) {
+    // ── Category summary — usa mergedCart ya calculado (evita doble getTotalAllSections) ──
+    const merged = _mergedCartArg || getTotalAllSections();
     const catCounts2 = { perfil:0, herraje:0, consumible:0, vidrio:0, otro:0 };
     const catNames2  = { perfil:[], herraje:[], consumible:[], vidrio:[], otro:[] };
     Object.entries(merged).forEach(([pid]) => {
@@ -3879,19 +3944,21 @@ function getNextFolio() { if (!data.history.length) return 1001; return data.his
 function renderFloatingBar() {
     // Bar is now rendered inline inside selected-list by renderSelectedList — nothing to do here
 }
-function confirmClearAll() {
+async function confirmClearAll() {
     if (_activeSectionId === null) {
         // Sección GENERAL activa
         const hasSections = (data.cartSections || []).length > 0;
         if (hasSections) {
             // Ask: clear just general, or everything?
-            const choice = confirm('¿Limpiar solo la sección GENERAL?\n\nAcepta = solo GENERAL\nCancela = limpiar TODO (incluyendo secciones)');
-            if (choice) {
+            const choice = await _dialog('¿Qué deseas limpiar?', ['Solo GENERAL', 'TODO (incluyendo secciones)', 'Cancelar']);
+            if (!choice || choice === 'Cancelar') return;
+            if (choice === 'Solo GENERAL') {
                 data.cart = {}; data.lastAddedOrder = []; data.cartInsumos = [];
                 _kitFallbackIds.clear();
                 save(); renderSelectedList(); showToast('Sección GENERAL limpiada', 'info');
             } else {
-                if (!confirm('¿Seguro que quieres borrar TODO, incluyendo todas las secciones?')) return;
+                const confirm2 = await _dialog('¿Borrar TODO, incluyendo todas las secciones?\nEsta acción no se puede deshacer.', ['Borrar todo', 'Cancelar']);
+                if (!confirm2 || confirm2 === 'Cancelar') return;
                 data.cart = {}; data.lastAddedOrder = []; data.cartInsumos = [];
                 data.cartSections = []; _activeSectionId = null;
                 data._clientName = ''; const _bcEl = document.getElementById('budget-client'); if(_bcEl) _bcEl.value = '';
@@ -3900,7 +3967,8 @@ function confirmClearAll() {
                 save(); renderSelectedList(); showToast('Todo limpiado', 'info');
             }
         } else {
-            if (!confirm('¿Limpiar todos los artículos?')) return;
+            const ok = await _dialog('¿Limpiar todos los artículos?', ['Limpiar', 'Cancelar']);
+            if (!ok || ok === 'Cancelar') return;
             data.cart = {}; data.lastAddedOrder = []; data.cartInsumos = [];
             data._clientName = ''; const _bcEl = document.getElementById('budget-client'); if(_bcEl) _bcEl.value = '';
             _currentInvoiceId = null;
@@ -3911,16 +3979,17 @@ function confirmClearAll() {
         // Una sección específica está activa — solo limpiar esa
         const s = data.cartSections.find(x => x.id === _activeSectionId);
         const name = s ? s.name : 'esta sección';
-        if (!confirm(`¿Limpiar los artículos de "${name}"?`)) return;
+        const ok = await _dialog(`¿Limpiar los artículos de "${name}"?`, ['Limpiar', 'Cancelar']);
+        if (!ok || ok === 'Cancelar') return;
         if (s) { s.cart = {}; s.lastAddedOrder = []; s.cartInsumos = []; }
         save(); renderSelectedList(); showToast(`"${name}" limpiada`, 'info');
     }
 }
-function saveAndShow() { vibrate(30);
+async function saveAndShow() { vibrate(30);
     const now = new Date();
     const dateStr = now.toLocaleDateString([], { day:'2-digit', month:'2-digit', year:'numeric' });
     let clientInput = toUpper(data._clientName || document.getElementById('budget-client')?.value || '');
-    if (!clientInput) { if (confirm("No ingresaste nombre de cliente. ¿Usar 'PÚBLICO EN GENERAL'?")) clientInput = 'PÚBLICO EN GENERAL'; else return; }
+    if (!clientInput) { const ans = await _dialog("No ingresaste nombre de cliente.", ["Usar 'PÚBLICO EN GENERAL'", 'Cancelar']); if (!ans || ans === 'Cancelar') return; clientInput = 'PÚBLICO EN GENERAL'; }
 
     // ── Consolidar secciones ──
     const sections = data.cartSections || [];
@@ -4005,7 +4074,7 @@ function viewInvoice(id) {
     document.getElementById('p-client-view').innerText = h.client;
     document.getElementById('p-date-view').innerText = h.date;
     document.getElementById('p-folio-view').innerText = h.folio;
-    document.getElementById('btn-edit-from-modal').onclick = () => { if(confirm('¿Deseas modificar este pedido? Se cargará en la pantalla principal para editar.')) editHistoryItem(id); };
+    document.getElementById('btn-edit-from-modal').onclick = async () => { const ok = await _dialog('¿Modificar este pedido?\nSe cargará en la pantalla principal para editar.', ['Modificar', 'Cancelar']); if (ok && ok !== 'Cancelar') editHistoryItem(id); };
     // Use saved insumosSnapshot if available; old tickets without it show no insumos (correct behavior)
     const insumos = Array.isArray(h.insumosSnapshot) ? h.insumosSnapshot : [];
     _currentInvoiceInsumos = insumos;
@@ -4179,7 +4248,7 @@ function toggleInvRow(rowId, checked) {
     else row.classList.remove('checked-row');
 }
 function adjustTableHeaderStickyTop() { const toolbar = document.getElementById('invoice-toolbar'); const ths = document.querySelectorAll('#invoice-table th'); if(!ths.length) return; let top = (toolbar && toolbar.style.display !== 'none' && toolbar.offsetHeight) ? toolbar.offsetHeight : 0; ths.forEach(th => th.style.top = top + 'px'); }
-function removeHistory(id) { if(confirm('¿Eliminar este pedido?')) { data.history = data.history.filter(x => x.id !== id); if(_currentInvoiceId === id) _currentInvoiceId = null; save(); renderHistory(); showToast('Pedido eliminado','info'); } }
+async function removeHistory(id) { const ok = await _dialog('¿Eliminar este pedido?', ['Eliminar', 'Cancelar']); if (!ok || ok === 'Cancelar') return; data.history = data.history.filter(x => x.id !== id); if(_currentInvoiceId === id) _currentInvoiceId = null; save(); renderHistory(); showToast('Pedido eliminado','info'); }
 function renderHistory() {
     const container = document.getElementById('history-list');
     const searchVal = normalizeText(document.getElementById('history-search')?.value || '');
@@ -4313,10 +4382,11 @@ function aplicarPorcentaje() {
     if(omitidos) msg += ` · ${omitidos} omitido${omitidos!==1?'s':''} (hoy)`;
     showToast(msg, pct > 0 ? 'success' : 'info');
 }
-function deshacerPrecios() {
+async function deshacerPrecios() {
     const respaldo = localStorage.getItem('respaldo_materiales');
     if(!respaldo) { showToast('No hay respaldo disponible','info'); return; }
-    if(!confirm('¿Restaurar precios al estado anterior?')) return;
+    const ok = await _dialog('¿Restaurar precios al estado anterior?', ['Restaurar', 'Cancelar']);
+    if (!ok || ok === 'Cancelar') return;
     data.prods = JSON.parse(respaldo);
     save();
     renderAll();
@@ -4380,7 +4450,7 @@ function updateAliases(id, val) {
     save();
     _priceEditorCache.key = null; // invalida caché para reflejar cambios en búsqueda
 }
-function deleteProduct(id) { if(confirm('¿Eliminar material?')) { data.prods = data.prods.filter(x=>x.id !== id); delete data.cart[id]; cleanupOrphanedKitItems(); save(); renderAll(); } }
+async function deleteProduct(id) { const ok = await _dialog('¿Eliminar este material del catálogo?', ['Eliminar', 'Cancelar']); if (!ok || ok === 'Cancelar') return; data.prods = data.prods.filter(x=>x.id !== id); delete data.cart[id]; cleanupOrphanedKitItems(); save(); renderAll(); }
 function ghostUpdate(inputId, ghostId, sourceFn) { const input = document.getElementById(inputId); const ghost = document.getElementById(ghostId); if(!input||!ghost) return; const q = input.value; if(!q) { ghost.textContent=''; return; } const sugg = sourceFn(q); if(sugg && sugg.toLowerCase().startsWith(q.toLowerCase())) ghost.textContent = q + sugg.slice(q.length); else ghost.textContent=''; }
 function getAcNames(q) { const qN = normalizeText(q); const m = data.prods.find(p=> normalizeText(p.name).startsWith(qN)); return m ? m.name : ''; }
 function getAcColors(q) { const qN = normalizeText(q); const m = data.prods.find(p=> p.color && normalizeText(p.color).startsWith(qN)); return m ? m.color : ''; }
@@ -5174,8 +5244,9 @@ function renderKitsScreen() {
         const bg = card.querySelector('.kit-card-swipe-bg');
         if (!inner || !kitId || card._swipeInit) return;
         card._swipeInit = true;
-        attachSwipe(card, inner, bg, () => {
-            if (confirm(`¿Eliminar la línea "${getKitById(kitId)?.name || kitId}"?`)) {
+        attachSwipe(card, inner, bg, async () => {
+            const ok = await _dialog(`¿Eliminar la línea "${getKitById(kitId)?.name || kitId}"?`, ['Eliminar', 'Cancelar']);
+            if (ok && ok !== 'Cancelar') {
                 data.kits = data.kits.filter(k => k.id !== kitId);
                 save(); populateKitSelector(true);
                 renderKitsScreen();
@@ -5283,7 +5354,7 @@ function duplicateKit(kitId) {
     populateKitSelector(true);
     showToast(`Kit duplicado: "${newKit.name}"`, 'success');
 }
-function renameKit(kitId) { const kit = getKitById(kitId); if(!kit) return; const newName = prompt('Nuevo nombre del kit:', kit.name); if(newName && newName.trim()) { kit.name = newName.trim().toUpperCase(); save(); renderKitsScreen(); populateKitSelector(true); showToast(`Kit renombrado a "${kit.name}"`,'success'); } }
+async function renameKit(kitId) { const kit = getKitById(kitId); if(!kit) return; const newName = await new Promise(resolve => { const overlay = document.createElement('div'); overlay.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)'; overlay.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-md);padding:22px 20px 16px;max-width:320px;width:100%;box-shadow:var(--shadow-lg);animation:popIn 0.22s cubic-bezier(.22,.68,0,1.12) both"><div style="font-size:15px;color:var(--text);font-family:var(--font);margin-bottom:12px">Nuevo nombre del kit:</div><input id="_dlg_input" type="text" value="${kit.name}" style="width:100%;padding:10px 14px;font-size:15px;border:1px solid var(--border2);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-family:var(--font);outline:none;text-transform:uppercase;margin-bottom:14px"><div style="display:flex;gap:8px"><button id="_dlg_cancel" style="padding:10px 18px;border-radius:var(--radius-sm);border:1px solid var(--border2);background:var(--surface2);color:var(--text2);font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;flex:1">Cancelar</button><button id="_dlg_ok" style="padding:10px 18px;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;flex:1">Guardar</button></div></div>`; document.body.appendChild(overlay); const inp = overlay.querySelector('#_dlg_input'); inp.focus(); inp.select(); const done = val => { overlay.remove(); resolve(val); }; overlay.querySelector('#_dlg_ok').onclick = () => done(inp.value); overlay.querySelector('#_dlg_cancel').onclick = () => done(null); inp.addEventListener('keydown', e => { if (e.key === 'Enter') done(inp.value); if (e.key === 'Escape') done(null); }); }); if(newName && newName.trim()) { kit.name = newName.trim().toUpperCase(); save(); renderKitsScreen(); populateKitSelector(true); showToast(`Kit renombrado a "${kit.name}"`,'success'); } }
 function saveKitName(kitId) {
     const kit = getKitById(kitId);
     if (!kit) return;
@@ -5298,7 +5369,7 @@ function saveKitName(kitId) {
     if (nameEl) nameEl.textContent = newName;
     showToast(`✓ Línea renombrada a "${newName}"`, 'success');
 }
-function deleteKit(kitId) { if(confirm('¿Eliminar este kit permanentemente?')) { data.kits = data.kits.filter(k=>k.id!==kitId); save(); renderKitsScreen(); populateKitSelector(true); showToast('Kit eliminado','info'); } }
+async function deleteKit(kitId) { const ok = await _dialog('¿Eliminar este kit permanentemente?', ['Eliminar', 'Cancelar']); if (!ok || ok === 'Cancelar') return; data.kits = data.kits.filter(k=>k.id!==kitId); save(); renderKitsScreen(); populateKitSelector(true); showToast('Kit eliminado','info'); }
 let _kbTimer = null;
 function debouncedKitBuilderSearch(val) { clearTimeout(_kbTimer); _kbTimer = setTimeout(()=>kitBuilderSearch(val),180); }
 function kitBuilderSearch(val) { const dd = document.getElementById('kit-builder-dropdown'); if(!val) { dd.style.display='none'; return; } const norm = normalizeText(val); const matches = data.prods.filter(p=> normalizeText(`${p.name} ${p.color} ${p.category}`).includes(norm) || (p.aliases||[]).some(a=>normalizeText(a).includes(norm))).slice(0,12); dd.innerHTML = matches.map(p=>{ const price = getProdMaxPrice(p); const cat = p.category||'perfil'; const aliasHit = !(normalizeText(`${p.name} ${p.color} ${p.category}`).includes(norm)) && (p.aliases||[]).some(a=>normalizeText(a).includes(norm)); return `<div class="dropdown-item" onclick="addToKitBuilder(${p.id})"><div><div class="dropdown-item-name">${(p.name||'').toUpperCase()} <span class="cat-badge ${cat}">${cat}</span>${aliasHit?'<span class="alias-match-badge">🏷️ alias</span>':''}</div><div class="dropdown-item-color">${(p.color||'N/A').toUpperCase()}</div></div><span class="dropdown-item-price">$${(price*IVA).toFixed(2)}</span></div>`; }).join(''); dd.style.display = matches.length ? 'block' : 'none'; }
@@ -6008,7 +6079,7 @@ function getVentaFolio() {
     if (!data.ventaHistory || !data.ventaHistory.length) return 5001;
     return data.ventaHistory.reduce((max, h) => Math.max(max, h.folio || 5000), 5000) + 1;
 }
-function saveVentaCotizacion() {
+async function saveVentaCotizacion() {
     // Incluir todo lo que tenga datos válidos — independiente del tab activo
     const includePerfiles = _pedItems.some(x => parseFloat(x.metros) > 0);
     const includeVidrios  = _vidItems.some(v => parseFloat(v.anchoCorte) > 0 && parseFloat(v.altoCorte) > 0);
@@ -6018,7 +6089,8 @@ function saveVentaCotizacion() {
     }
     let cliente = (document.getElementById('ventas-client')?.value || '').trim().toUpperCase();
     if (!cliente) {
-        if (!confirm("Sin nombre de cliente. ¿Usar 'PÚBLICO EN GENERAL'?")) return;
+        const ans = await _dialog("Sin nombre de cliente.", ["Usar 'PÚBLICO EN GENERAL'", 'Cancelar']);
+        if (!ans || ans === 'Cancelar') return;
         cliente = 'PÚBLICO EN GENERAL';
     }
     const now = new Date();
@@ -6257,10 +6329,11 @@ function toggleVentaDetail(id) {
     el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
-function deleteVentaCotiz(id) {
+async function deleteVentaCotiz(id) {
     const h = (data.ventaHistory || []).find(x => x.id === id);
     if (!h) return;
-    if (!confirm('¿Eliminar cotización #' + h.folio + ' de ' + h.cliente + '?')) return;
+    const ok = await _dialog('¿Eliminar cotización #' + h.folio + ' de ' + h.cliente + '?', ['Eliminar', 'Cancelar']);
+    if (!ok || ok === 'Cancelar') return;
     data.ventaHistory = data.ventaHistory.filter(x => x.id !== id);
     save();
     renderVentaHistory();
@@ -6596,7 +6669,8 @@ async function registrarSesion(user) {
     } catch (e) { console.warn('[Sesión] Error registrando sesión:', e.message); return; }
     window.addEventListener('beforeunload', cerrarSesion);
     document.addEventListener('visibilitychange', () => actualizarActividad(!document.hidden));
-    setInterval(() => { if (!document.hidden) actualizarActividad(true); }, 60000);
+    // Heartbeat cada 3 min (antes 1 min) — reduce writes a Firestore ~66%
+    setInterval(() => { if (!document.hidden) actualizarActividad(true); }, 180000);
     if (!_fbIsAdmin) {
         try {
             await _db.collection('notificaciones_admin').add({
@@ -6797,11 +6871,7 @@ async function adminCargarDashboard() {
     }
 }
 
-// ── Gráfica circular por función ──
-function adminRenderChartDias(sesiones, eventos) {
-    // Se llama con eventos desde adminCargarDashboard
-    // sesiones se ignora — usamos eventos para el pastel
-}
+// adminRenderChartDias eliminado — sin uso, reemplazado por adminRenderPieChart
 
 function adminRenderPieChart(eventos) {
     const canvas  = document.getElementById('admin-pie-canvas');
@@ -7632,7 +7702,8 @@ function adminToggleSesDetalle(id) {
 // ── Borrar una sesión individual ──
 async function adminBorrarSesion(sesionId, uid) {
     if (!sesionId) { showToast('ID de sesión no disponible', 'info'); return; }
-    if (!confirm('¿Borrar esta sesión y sus eventos? No se puede deshacer.')) return;
+    const ok = await _dialog('¿Borrar esta sesión y sus eventos?\nEsta acción no se puede deshacer.', ['Borrar', 'Cancelar']);
+    if (!ok || ok === 'Cancelar') return;
     try {
         const batch = _db.batch();
         // Borrar el documento de sesión
@@ -7651,7 +7722,8 @@ async function adminBorrarSesion(sesionId, uid) {
 
 // ── Borrar todos los registros de un usuario ──
 async function adminBorrarUsuarioCompleto(uid, nombre) {
-    if (!confirm(`¿Borrar TODAS las sesiones y eventos de "${nombre}"?\n\nEsto eliminará su historial completo de los reportes. No se puede deshacer.`)) return;
+    const ok = await _dialog(`¿Borrar TODAS las sesiones y eventos de "${nombre}"?\n\nEsto eliminará su historial completo de los reportes. No se puede deshacer.`, ['Borrar todo', 'Cancelar']);
+    if (!ok || ok === 'Cancelar') return;
     showToast('Borrando registros...', 'info');
     try {
         // Borrar sesiones
@@ -7746,8 +7818,9 @@ async function doRegister() {
     }
 }
 
-function fbSignOut() {
-    if (confirm('¿Cerrar sesión?')) _auth.signOut();
+async function fbSignOut() {
+    const ok = await _dialog('¿Cerrar sesión?', ['Cerrar sesión', 'Cancelar']);
+    if (ok && ok !== 'Cancelar') _auth.signOut();
 }
 
 async function fbLoadCatalogo() {
