@@ -3986,6 +3986,9 @@ async function confirmClearAll() {
     }
 }
 async function saveAndShow() { vibrate(30);
+    // [GUEST MODE] ── Verifica cuota de invitado ── BORRAR PARA REMOVER ──
+    if (GuestController.interceptarCotizacion()) return;
+    // [/GUEST MODE] ────────────────────────────────────────────────────────
     const now = new Date();
     const dateStr = now.toLocaleDateString([], { day:'2-digit', month:'2-digit', year:'numeric' });
     let clientInput = toUpper(data._clientName || document.getElementById('budget-client')?.value || '');
@@ -6080,6 +6083,9 @@ function getVentaFolio() {
     return data.ventaHistory.reduce((max, h) => Math.max(max, h.folio || 5000), 5000) + 1;
 }
 async function saveVentaCotizacion() {
+    // [GUEST MODE] ── Verifica cuota de invitado ── BORRAR PARA REMOVER ──
+    if (GuestController.interceptarCotizacion()) return;
+    // [/GUEST MODE] ────────────────────────────────────────────────────────
     // Incluir todo lo que tenga datos válidos — independiente del tab activo
     const includePerfiles = _pedItems.some(x => parseFloat(x.metros) > 0);
     const includeVidrios  = _vidItems.some(v => parseFloat(v.anchoCorte) > 0 && parseFloat(v.altoCorte) > 0);
@@ -7901,6 +7907,9 @@ _auth.onAuthStateChanged(async (user) => {
     const appMain     = document.getElementById('app-main');
 
     if (user) {
+        // [GUEST MODE] ── Limpia datos demo al autenticar ── BORRAR PARA REMOVER ──
+        GuestController.onLogin();
+        // [/GUEST MODE] ────────────────────────────────────────────────────────────
         _currentUser = user;
 
         // ① Verificar rol desde Firestore — ANTES de mostrar la app
@@ -7966,6 +7975,10 @@ _auth.onAuthStateChanged(async (user) => {
         })();
 
     } else {
+        // [GUEST MODE] ── Activa Modo Invitado si no hay sesión ── BORRAR PARA REMOVER ──
+        GuestController.activar();
+        return;
+        // [/GUEST MODE] ────────────────────────────────────────────────────────────────
         _currentUser = null;
         _fbIsAdmin   = false;
         cerrarSesion();
@@ -8541,5 +8554,8 @@ document.addEventListener('pointerdown', function(e) {
 }, { passive: true });
 </script>
 
+<!-- [GUEST MODE] ── Módulo Modo Invitado ── BORRAR ESTA LÍNEA PARA REMOVER ── -->
+<script src="guestController.js"></script>
+<!-- [/GUEST MODE] ──────────────────────────────────────────────────────────── -->
 </body>
 </html>
