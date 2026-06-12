@@ -316,7 +316,7 @@ const GuestController = (() => {
         border-radius: 24px 24px 20px 20px; max-width: 440px; width: 100%;
         padding: 26px 22px 22px;
         box-shadow: 0 -8px 48px rgba(0,0,0,0.55);
-        animation: gcSlideUp .4s cubic-bezier(.22,.68,0,1.12) both;
+        animation: gcSlideUpCard .4s cubic-bezier(.22,.68,0,1.12) both;
         max-height: 85vh; overflow-y: auto; box-sizing: border-box;
       }
       .gc-wc-emoji { font-size: 34px; margin-bottom: 6px; }
@@ -413,7 +413,8 @@ const GuestController = (() => {
 
       /* ── Keyframes ── */
       @keyframes gcFadeIn  { from{opacity:0} to{opacity:1} }
-      @keyframes gcSlideUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+      @keyframes gcSlideUp { from{opacity:0;transform:translateX(-50%) translateY(24px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+      @keyframes gcSlideUpCard { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
       @keyframes gcPopIn      { from{opacity:0;transform:scale(.88) translateY(16px)} to{opacity:1;transform:scale(1) translateY(0)} }
       @keyframes gcPopInSimple { from{opacity:0} to{opacity:1} }
     `;
