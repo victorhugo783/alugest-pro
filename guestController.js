@@ -353,8 +353,24 @@ const GuestController = (() => {
       /* ── Tour ── */
       #gc-tour-spotlight {
         position:fixed; inset:0; z-index:9989;
-        background:rgba(8,12,24,0.50); backdrop-filter:blur(6px) saturate(160%);
+        background:rgba(8,12,24,0.62);
         animation:gcFadeIn .25s ease both;
+        transition: clip-path .3s ease;
+      }
+      /* Anillo de foco visible alrededor del elemento destacado */
+      #gc-tour-focus-ring {
+        position:fixed; z-index:9993; pointer-events:none;
+        border-radius:12px;
+        box-shadow:
+          0 0 0 3px rgba(124,157,255,0.9),
+          0 0 0 6px rgba(124,157,255,0.25),
+          0 0 24px 8px rgba(124,157,255,0.30);
+        transition: all .3s cubic-bezier(.22,.68,0,1.12);
+        animation: gcRingPulse 1.8s ease-in-out infinite;
+      }
+      @keyframes gcRingPulse {
+        0%,100%{ box-shadow:0 0 0 3px rgba(124,157,255,0.9),0 0 0 6px rgba(124,157,255,0.25),0 0 24px 8px rgba(124,157,255,0.30); }
+        50%    { box-shadow:0 0 0 3px rgba(124,157,255,1.0),0 0 0 8px rgba(124,157,255,0.35),0 0 32px 12px rgba(124,157,255,0.45); }
       }
       #gc-tour-card {
         position:fixed; z-index:9991;
@@ -371,13 +387,23 @@ const GuestController = (() => {
       .gc-tour-arrow { position:absolute; width:0; height:0; }
       .gc-tour-arrow.down {
         border-left:10px solid transparent; border-right:10px solid transparent;
-        border-top:11px solid rgba(124,157,255,0.28);
-        bottom:-12px;
+        border-top:11px solid rgba(124,157,255,0.45);
+        bottom:-11px;
       }
       .gc-tour-arrow.down::after {
         content:''; position:absolute; top:-13px; left:-9px;
         border-left:9px solid transparent; border-right:9px solid transparent;
-        border-top:10px solid rgba(15,22,42,0.58);
+        border-top:10px solid rgba(15,22,42,0.75);
+      }
+      .gc-tour-arrow.up {
+        border-left:10px solid transparent; border-right:10px solid transparent;
+        border-bottom:11px solid rgba(124,157,255,0.45);
+        top:-11px;
+      }
+      .gc-tour-arrow.up::after {
+        content:''; position:absolute; bottom:-13px; left:-9px;
+        border-left:9px solid transparent; border-right:9px solid transparent;
+        border-bottom:10px solid rgba(15,22,42,0.75);
       }
       .gc-tour-step-num { font-family:'DM Mono',monospace; font-size:10px; color:#6a80a8; letter-spacing:.5px; margin-bottom:6px; }
       .gc-tour-title    { font-family:'DM Sans',system-ui,sans-serif; font-size:15px; font-weight:800; color:#f0f4ff; margin:0 0 7px; line-height:1.3; }
@@ -512,7 +538,7 @@ const GuestController = (() => {
   }
 
   function _renderTourStep() {
-    ['gc-tour-spotlight','gc-tour-card'].forEach(id=>{const e=document.getElementById(id);if(e)e.remove();});
+    ['gc-tour-spotlight','gc-tour-card','gc-tour-focus-ring'].forEach(id=>{const e=document.getElementById(id);if(e)e.remove();});
     const step=TOUR_STEPS[_tourStep], total=TOUR_STEPS.length, isLast=_tourStep===total-1;
 
     const spotlight=document.createElement('div');
@@ -543,33 +569,62 @@ const GuestController = (() => {
       const anchor = document.querySelector(step.target);
       if (anchor) {
         const rect = anchor.getBoundingClientRect();
-        // Centrar horizontalmente sobre el anchor
+        const PAD  = 10; // padding alrededor del elemento destacado
+
+        // ── Spotlight con agujero recortado (clip-path evenodd) ──────────
+        // Polígono exterior = pantalla completa (sentido horario)
+        // Polígono interior = hueco del elemento (sentido antihorario) → crea agujero
+        const W = window.innerWidth, H = window.innerHeight;
+        const hx1 = Math.max(0, rect.left  - PAD);
+        const hy1 = Math.max(0, rect.top   - PAD);
+        const hx2 = Math.min(W, rect.right + PAD);
+        const hy2 = Math.min(H, rect.bottom+ PAD);
+        spotlight.style.clipPath = [
+          'polygon(evenodd,',
+          // exterior (horario)
+          `0px 0px, ${W}px 0px, ${W}px ${H}px, 0px ${H}px, 0px 0px,`,
+          // hueco (antihorario)
+          `${hx1}px ${hy1}px, ${hx1}px ${hy2}px, ${hx2}px ${hy2}px, ${hx2}px ${hy1}px, ${hx1}px ${hy1}px`,
+          ')'
+        ].join(' ');
+
+        // ── Anillo de foco sobre el elemento ────────────────────────────
+        const ring = document.createElement('div');
+        ring.id = 'gc-tour-focus-ring';
+        ring.style.left   = hx1 + 'px';
+        ring.style.top    = hy1 + 'px';
+        ring.style.width  = (hx2 - hx1) + 'px';
+        ring.style.height = (hy2 - hy1) + 'px';
+        // Ajustar border-radius al del elemento si lo tiene
+        const anchorBr = getComputedStyle(anchor).borderRadius;
+        ring.style.borderRadius = anchorBr && anchorBr !== '0px' ? anchorBr : '10px';
+        document.body.appendChild(ring);
+
+        // ── Posicionar la tarjeta ────────────────────────────────────────
         let left = rect.left + rect.width / 2 - cardW / 2;
         left = Math.max(16, Math.min(left, window.innerWidth - cardW - 16));
-        // Colocar encima; si no cabe, abajo
-        let top = rect.top - cardH - 16;
-        if (top < 70) top = rect.bottom + 16;
+        let top = rect.top - cardH - 24;
+        if (top < 70) top = rect.bottom + 24;
         top = Math.max(70, Math.min(top, window.innerHeight - cardH - 16));
         card.style.left      = left + 'px';
         card.style.top       = top  + 'px';
         card.style.transform = 'none';
-        // Flecha apuntando al botón
+
+        // ── Flecha apuntando al elemento ─────────────────────────────────
         const arrow = document.createElement('div');
-        arrow.className = 'gc-tour-arrow down';
+        const cardBottom = top + cardH;
+        arrow.className = cardBottom <= rect.top ? 'gc-tour-arrow down' : 'gc-tour-arrow up';
         const arrowLeft = (rect.left + rect.width / 2) - left;
         arrow.style.left      = Math.max(16, Math.min(arrowLeft, cardW - 20)) + 'px';
         arrow.style.transform = 'none';
         card.appendChild(arrow);
-        // Highlight
-        anchor.style.position     = 'relative';
-        anchor.style.zIndex       = '9995';
-        anchor.style.boxShadow    = '0 0 0 3px rgba(124,157,255,0.75),0 0 20px 5px rgba(124,157,255,0.30)';
-        anchor.style.borderRadius = '10px';
+
         card._hl = anchor;
       } else {
         _centerCard(card, cardW, cardH);
       }
     } else {
+      // Sin target — solo overlay oscuro sin agujero, centrado
       _centerCard(card, cardW, cardH);
     }
   }
@@ -584,9 +639,14 @@ const GuestController = (() => {
   }
 
   function _clearHighlight() {
+    // Limpiar focus-ring y clip-path del spotlight
+    const ring=document.getElementById('gc-tour-focus-ring'); if(ring) ring.remove();
+    const sp=document.getElementById('gc-tour-spotlight'); if(sp) sp.style.clipPath='';
+    // Limpiar cualquier estilo residual en el anchor
     const card=document.getElementById('gc-tour-card');
     if (card && card._hl) {
-      card._hl.style.boxShadow=''; card._hl.style.zIndex=''; card._hl.style.borderRadius='';
+      card._hl.style.position=''; card._hl.style.zIndex='';
+      card._hl.style.boxShadow=''; card._hl.style.borderRadius='';
     }
   }
 
@@ -597,8 +657,8 @@ const GuestController = (() => {
 
   function _closeTour() {
     _tourOpen=false; _markTourDone();
-    ['gc-tour-spotlight','gc-tour-card'].forEach(id=>{const e=document.getElementById(id);if(e)e.remove();});
-    document.querySelectorAll('.nav-btn').forEach(el=>{el.style.boxShadow='';el.style.zIndex='';el.style.borderRadius='';});
+    ['gc-tour-spotlight','gc-tour-card','gc-tour-focus-ring'].forEach(id=>{const e=document.getElementById(id);if(e)e.remove();});
+    document.querySelectorAll('.nav-btn').forEach(el=>{el.style.position='';el.style.boxShadow='';el.style.zIndex='';el.style.borderRadius='';});
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
