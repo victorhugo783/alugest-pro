@@ -696,9 +696,24 @@ const GuestController = (() => {
     if (typeof aplicarPermisosUsuario==='function')  aplicarPermisosUsuario(false);
 
     // ③  Cargar catálogo real de Firestore (prods, kits, distributors)
-    //    Esto habilita búsquedas, kits, Ventas y Comparar
+    //    Firestore requiere request.auth != null; el invitado no tiene sesión,
+    //    por eso primero obtenemos credenciales anónimas (solo lectura) y luego
+    //    cargamos el catálogo. La bandera window._guestAnonAuth evita que
+    //    onAuthStateChanged procese al usuario anónimo como cuenta real.
     if (typeof fbLoadCatalogo==='function') {
-      try { await fbLoadCatalogo(); } catch(e) { console.warn('[GuestMode] Catálogo sin conexión, usando local'); }
+      try {
+        const auth = (typeof firebase!=='undefined') ? firebase.auth() : null;
+        if (auth && !auth.currentUser) {
+          window._guestAnonAuth = true;          // señal para onAuthStateChanged
+          await auth.signInAnonymously();        // dispara onAuthStateChanged →
+          // onAuthStateChanged detecta _guestAnonAuth y aborta el flujo normal;
+          // el catálogo se carga a continuación con las credenciales activas.
+        }
+        await fbLoadCatalogo();
+      } catch(e) {
+        window._guestAnonAuth = false;
+        console.warn('[GuestMode] Catálogo sin conexión, usando local', e.message||e);
+      }
     }
 
     // ④  Inicializar app

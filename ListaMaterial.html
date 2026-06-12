@@ -7907,6 +7907,11 @@ _auth.onAuthStateChanged(async (user) => {
     const appMain     = document.getElementById('app-main');
 
     if (user) {
+        // [GUEST MODE] ── Si es sesión anónima del invitado, ignorar flujo normal ──
+        if (user.isAnonymous && window._guestAnonAuth) {
+            window._guestAnonAuth = false;  // consumir bandera
+            return;                         // fbLoadCatalogo ya se llamó desde activar()
+        }
         // [GUEST MODE] ── Limpia modo invitado al autenticar ── BORRAR PARA REMOVER ──
         GuestController.onLogin();
         // [/GUEST MODE] ────────────────────────────────────────────────────────────────
