@@ -216,8 +216,8 @@ const GuestController = (() => {
         display: flex;
         align-items: center;
         gap: 10px;
-        background: rgba(26,34,54,0.95);
-        backdrop-filter: blur(16px) saturate(180%);
+        background: rgba(20,28,48,0.55);
+        backdrop-filter: blur(24px) saturate(200%);
         border: 1px solid rgba(124,157,255,0.35);
         border-radius: 50px;
         padding: 9px 16px 9px 14px;
@@ -247,14 +247,14 @@ const GuestController = (() => {
       /* ── Paywall ── */
       #gc-paywall {
         position: fixed; inset: 0; z-index: 9998;
-        background: rgba(10,14,26,0.80);
-        backdrop-filter: blur(18px) saturate(160%);
+        background: rgba(8,12,24,0.55);
+        backdrop-filter: blur(28px) saturate(200%);
         display: flex; align-items: center; justify-content: center;
         padding: 20px; animation: gcFadeIn .28s ease both;
         box-sizing: border-box;
       }
       #gc-paywall-card {
-        background: rgba(26,34,54,0.97);
+        background: rgba(20,28,48,0.60);
         border: 1px solid rgba(124,157,255,0.22);
         border-radius: 24px; max-width: 380px; width: 100%;
         box-shadow: 0 24px 64px rgba(0,0,0,0.55);
@@ -305,13 +305,13 @@ const GuestController = (() => {
       /* ── Welcome Sheet ── */
       #gc-welcome {
         position: fixed; inset: 0; z-index: 9997;
-        background: rgba(10,14,26,0.82); backdrop-filter: blur(20px);
+        background: rgba(8,12,24,0.55); backdrop-filter: blur(28px) saturate(200%);
         display: flex; align-items: flex-end; justify-content: center;
         padding: 0 16px 24px; animation: gcFadeIn .3s ease both;
         box-sizing: border-box;
       }
       #gc-welcome-card {
-        background: rgba(20,28,48,0.97);
+        background: rgba(15,22,42,0.55);
         border: 1px solid rgba(124,157,255,0.22);
         border-radius: 24px 24px 20px 20px; max-width: 440px; width: 100%;
         padding: 26px 22px 22px;
@@ -353,12 +353,12 @@ const GuestController = (() => {
       /* ── Tour ── */
       #gc-tour-spotlight {
         position:fixed; inset:0; z-index:9989;
-        background:rgba(10,14,26,0.72); backdrop-filter:blur(2px);
+        background:rgba(8,12,24,0.50); backdrop-filter:blur(6px) saturate(160%);
         animation:gcFadeIn .25s ease both;
       }
       #gc-tour-card {
         position:fixed; z-index:9991;
-        background:rgba(20,28,48,0.98);
+        background:rgba(15,22,42,0.58);
         border:1px solid rgba(124,157,255,0.28);
         border-radius:18px;
         max-width: min(320px, calc(100vw - 32px));
@@ -377,7 +377,7 @@ const GuestController = (() => {
       .gc-tour-arrow.down::after {
         content:''; position:absolute; top:-13px; left:-9px;
         border-left:9px solid transparent; border-right:9px solid transparent;
-        border-top:10px solid rgba(20,28,48,0.98);
+        border-top:10px solid rgba(15,22,42,0.58);
       }
       .gc-tour-step-num { font-family:'DM Mono',monospace; font-size:10px; color:#6a80a8; letter-spacing:.5px; margin-bottom:6px; }
       .gc-tour-title    { font-family:'DM Sans',system-ui,sans-serif; font-size:15px; font-weight:800; color:#f0f4ff; margin:0 0 7px; line-height:1.3; }
@@ -403,7 +403,7 @@ const GuestController = (() => {
       .gc-tip-btn:hover { background:rgba(124,157,255,0.22); }
       .gc-tooltip-popup {
         position:fixed; z-index:9500;
-        background:rgba(20,28,48,0.97); border:1px solid rgba(124,157,255,0.25);
+        background:rgba(15,22,42,0.55); border:1px solid rgba(124,157,255,0.25);
         border-radius:12px; padding:12px 14px; max-width:260px;
         box-shadow:0 6px 28px rgba(0,0,0,0.45);
         font-family:'DM Sans',system-ui,sans-serif; font-size:12px; color:#a8b8d8; line-height:1.5;
@@ -541,7 +541,7 @@ const GuestController = (() => {
         left=Math.max(16,Math.min(left,window.innerWidth-cardW-16));
         // Colocar sobre la nav bar
         const topPos=rect.top-170;
-        card.style.cssText+=`left:${left}px;top:${Math.max(60,topPos)}px;max-width:${cardW}px;`;
+        card.style.left=left+'px'; card.style.top=Math.max(60,topPos)+'px'; card.style.maxWidth=cardW+'px'; card.style.transform='none';
         // Flecha apuntando al botón
         const arrow=document.createElement('div');
         arrow.className='gc-tour-arrow down';
@@ -560,7 +560,7 @@ const GuestController = (() => {
   }
 
   function _centerCard(card) {
-    card.style.cssText+='left:50%;top:50%;transform:translate(-50%,-50%);';
+    card.style.left='50%'; card.style.top='50%'; card.style.transform='translate(-50%,-50%)';
   }
 
   function _clearHighlight() {
