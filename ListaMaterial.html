@@ -7907,9 +7907,9 @@ _auth.onAuthStateChanged(async (user) => {
     const appMain     = document.getElementById('app-main');
 
     if (user) {
-        // [GUEST MODE] ── Limpia datos demo al autenticar ── BORRAR PARA REMOVER ──
+        // [GUEST MODE] ── Limpia modo invitado al autenticar ── BORRAR PARA REMOVER ──
         GuestController.onLogin();
-        // [/GUEST MODE] ────────────────────────────────────────────────────────────
+        // [/GUEST MODE] ────────────────────────────────────────────────────────────────
         _currentUser = user;
 
         // ① Verificar rol desde Firestore — ANTES de mostrar la app
