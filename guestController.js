@@ -365,7 +365,7 @@ const GuestController = (() => {
         width: calc(100vw - 32px);
         padding:20px 20px 16px;
         box-shadow:0 8px 40px rgba(0,0,0,0.55);
-        animation:gcPopIn .28s cubic-bezier(.22,.68,0,1.12) both;
+        animation:gcPopInSimple .25s ease both;
         box-sizing:border-box;
       }
       .gc-tour-arrow { position:absolute; width:0; height:0; }
@@ -414,7 +414,8 @@ const GuestController = (() => {
       /* ── Keyframes ── */
       @keyframes gcFadeIn  { from{opacity:0} to{opacity:1} }
       @keyframes gcSlideUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
-      @keyframes gcPopIn   { from{opacity:0;transform:scale(.88) translateY(16px)} to{opacity:1;transform:scale(1) translateY(0)} }
+      @keyframes gcPopIn      { from{opacity:0;transform:scale(.88) translateY(16px)} to{opacity:1;transform:scale(1) translateY(0)} }
+      @keyframes gcPopInSimple { from{opacity:0} to{opacity:1} }
     `;
     document.head.appendChild(s);
   }
@@ -531,36 +532,54 @@ const GuestController = (() => {
       </div>`;
     document.body.appendChild(card);
 
-    // Posicionar
+    // Calcular dimensiones reales ya con el card en el DOM
+    const cardW = Math.min(340, window.innerWidth - 32);
+    const cardH = card.offsetHeight || 220;
+    card.style.width    = cardW + 'px';
+    card.style.maxWidth = cardW + 'px';
+
     if (step.target) {
-      const anchor=document.querySelector(step.target);
+      const anchor = document.querySelector(step.target);
       if (anchor) {
-        const rect=anchor.getBoundingClientRect();
-        const cardW=Math.min(320, window.innerWidth-32);
-        let left=rect.left+rect.width/2-cardW/2;
-        left=Math.max(16,Math.min(left,window.innerWidth-cardW-16));
-        // Colocar sobre la nav bar
-        const topPos=rect.top-170;
-        card.style.left=left+'px'; card.style.top=Math.max(60,topPos)+'px'; card.style.maxWidth=cardW+'px'; card.style.transform='none';
+        const rect = anchor.getBoundingClientRect();
+        // Centrar horizontalmente sobre el anchor
+        let left = rect.left + rect.width / 2 - cardW / 2;
+        left = Math.max(16, Math.min(left, window.innerWidth - cardW - 16));
+        // Colocar encima; si no cabe, abajo
+        let top = rect.top - cardH - 16;
+        if (top < 70) top = rect.bottom + 16;
+        top = Math.max(70, Math.min(top, window.innerHeight - cardH - 16));
+        card.style.left      = left + 'px';
+        card.style.top       = top  + 'px';
+        card.style.transform = 'none';
         // Flecha apuntando al botón
-        const arrow=document.createElement('div');
-        arrow.className='gc-tour-arrow down';
-        const arrowLeft=(rect.left+rect.width/2)-left;
-        arrow.style.left=`${Math.max(16,Math.min(arrowLeft,cardW-20))}px`;
-        arrow.style.transform='none';
+        const arrow = document.createElement('div');
+        arrow.className = 'gc-tour-arrow down';
+        const arrowLeft = (rect.left + rect.width / 2) - left;
+        arrow.style.left      = Math.max(16, Math.min(arrowLeft, cardW - 20)) + 'px';
+        arrow.style.transform = 'none';
         card.appendChild(arrow);
         // Highlight
-        anchor.style.position='relative';
-        anchor.style.zIndex='9995';
-        anchor.style.boxShadow='0 0 0 3px rgba(124,157,255,0.75),0 0 20px 5px rgba(124,157,255,0.30)';
-        anchor.style.borderRadius='10px';
-        card._hl=anchor;
-      } else { _centerCard(card); }
-    } else { _centerCard(card); }
+        anchor.style.position     = 'relative';
+        anchor.style.zIndex       = '9995';
+        anchor.style.boxShadow    = '0 0 0 3px rgba(124,157,255,0.75),0 0 20px 5px rgba(124,157,255,0.30)';
+        anchor.style.borderRadius = '10px';
+        card._hl = anchor;
+      } else {
+        _centerCard(card, cardW, cardH);
+      }
+    } else {
+      _centerCard(card, cardW, cardH);
+    }
   }
 
-  function _centerCard(card) {
-    card.style.left='50%'; card.style.top='50%'; card.style.transform='translate(-50%,-50%)';
+  function _centerCard(card, cardW, cardH) {
+    // Centrado en px reales — sin transform para no pelear con la animacion gcPopIn
+    cardW = cardW || card.offsetWidth  || Math.min(340, window.innerWidth  - 32);
+    cardH = cardH || card.offsetHeight || 220;
+    card.style.left      = Math.round((window.innerWidth  - cardW) / 2) + 'px';
+    card.style.top       = Math.round((window.innerHeight - cardH) / 2) + 'px';
+    card.style.transform = 'none';
   }
 
   function _clearHighlight() {
