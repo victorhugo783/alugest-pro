@@ -7953,8 +7953,9 @@ _auth.onAuthStateChanged(async (user) => {
                     const btn = document.createElement('button');
                     btn.id = 'btn-signout';
                     btn.className = 'btn-main ghost-btn';
-                    btn.style.cssText = 'margin:8px 0;width:100%;color:var(--danger)';
-                    btn.innerHTML = '🚪 Cerrar sesión (' + (user.displayName || user.email) + ')';
+                    btn.style.cssText = 'margin:8px 0;width:100%;color:var(--danger);text-transform:none;font-size:13px';
+                    const _userLabel = (user.displayName || user.email || 'usuario').toLowerCase();
+                    btn.innerHTML = '🚪 Cerrar sesión &nbsp;<span style="font-weight:400;opacity:0.75">(' + _userLabel + ')</span>';
                     btn.onclick = fbSignOut;
                     configScreen.querySelector('.container')?.appendChild(btn);
                 }

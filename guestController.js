@@ -497,11 +497,16 @@ const GuestController = (() => {
   function _cerrarPaywall() { const el=document.getElementById('gc-paywall'); if(el) el.remove(); }
   function _irALogin() {
     _cerrarPaywall();
+    _desactivar();
+    // Cierra la sesión anónima de Firebase (si existe) antes de mostrar login
+    try {
+      const auth = (typeof firebase !== 'undefined') ? firebase.auth() : null;
+      if (auth && auth.currentUser) auth.signOut().catch(()=>{});
+    } catch(e) {}
     const appMain=document.getElementById('app-main');
     const ls=document.getElementById('login-screen');
     if (appMain) appMain.style.display='none';
     if (ls) { ls.style.display='flex'; ls.style.flexDirection='column'; }
-    _desactivar();
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
@@ -718,11 +723,31 @@ const GuestController = (() => {
     data.ventaHistory=(data.ventaHistory||[]).filter(h=>!h._isDemo);
   }
 
+  function _renderGuestSessionBtn() {
+    // Elimina botón registrado anterior (si quedó de sesión previa)
+    const old = document.getElementById('btn-signout');
+    if (old) old.remove();
+    // Evita duplicado del botón invitado
+    if (document.getElementById('gc-session-btn')) return;
+    const configScreen = document.getElementById('screen-config');
+    if (!configScreen) return;
+    const container = configScreen.querySelector('.container');
+    if (!container) return;
+    const btn = document.createElement('button');
+    btn.id = 'gc-session-btn';
+    btn.className = 'btn-main ghost-btn';
+    btn.style.cssText = 'margin:8px 0;width:100%;color:var(--danger);text-transform:none;font-size:13px';
+    btn.innerHTML = '🚪 Cerrar sesión &nbsp;<span style="font-weight:400;opacity:0.75">(usuario invitado)</span>';
+    btn.onclick = () => _irALogin();
+    container.appendChild(btn);
+  }
+
   function _desactivar() {
     _active=false; _closeTour();
     localStorage.removeItem(GUEST_ACTIVE);
     _limpiarMockData();
     const b=document.getElementById('gc-banner'); if(b) b.remove();
+    const s=document.getElementById('gc-session-btn'); if(s) s.remove();
   }
 
   /* ══════════════════════════════════════════════════════════════════════════
@@ -793,6 +818,7 @@ const GuestController = (() => {
       _renderBanner();
       _injectTooltips();
       _showWelcome();
+      _renderGuestSessionBtn();
     }, 400);
   }
 
