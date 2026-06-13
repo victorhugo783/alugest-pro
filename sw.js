@@ -1,8 +1,9 @@
-// AluGest Pro — Service Worker v5
+// AluGest Pro — Service Worker v6
 // Estrategia: Network First con fallback a caché
 // Ciclo de vida: skipWaiting + clients.claim para activación inmediata
+// CAMBIOS v6: bump de versión para invalidar caché en todos los dispositivos
 
-const CACHE_NAME   = 'alugest-v5';
+const CACHE_NAME   = 'alugest-v6';
 const CACHE_ASSETS = [
     './ListaMaterial.html',
     './manifest.json',

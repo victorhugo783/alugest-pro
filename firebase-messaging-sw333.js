@@ -1,23 +1,19 @@
 // ══════════════════════════════════════════════
 //  AluGest Pro — Firebase Messaging Service Worker
 //  Requerido por FCM para notificaciones en background
-//  CORRECCIÓN: manejo robusto de errores + guards de inicialización duplicada
 // ══════════════════════════════════════════════
 
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
 
-// Guard para evitar doble inicialización si el SW es reutilizado
-if (!firebase.apps.length) {
-    firebase.initializeApp({
-        apiKey: "AIzaSyCH1fPqUeAI8pdzTw6LK8_EtzlVDaOkFqY",
-        authDomain: "alugest-pro.firebaseapp.com",
-        projectId: "alugest-pro",
-        storageBucket: "alugest-pro.firebasestorage.app",
-        messagingSenderId: "732479666613",
-        appId: "1:732479666613:web:e82bdc0bf8aa54a2f801fc"
-    });
-}
+firebase.initializeApp({
+    apiKey: "AIzaSyCH1fPqUeAI8pdzTw6LK8_EtzlVDaOkFqY",
+    authDomain: "alugest-pro.firebaseapp.com",
+    projectId: "alugest-pro",
+    storageBucket: "alugest-pro.firebasestorage.app",
+    messagingSenderId: "732479666613",
+    appId: "1:732479666613:web:e82bdc0bf8aa54a2f801fc"
+});
 
 const messaging = firebase.messaging();
 

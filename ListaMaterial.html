@@ -6636,7 +6636,20 @@ async function initFCM(user) {
         _messaging = firebase.messaging();
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') return;
-        const token = await _messaging.getToken({ vapidKey: VAPID_KEY });
+
+        // Registrar explícitamente el SW de FCM y pasárselo a getToken.
+        // Sin esto, algunos dispositivos/navegadores no pueden encontrar
+        // el SW correcto y lanzan un error silencioso al llamar getToken().
+        let swReg;
+        try {
+            swReg = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+            await navigator.serviceWorker.ready;
+        } catch (swErr) {
+            console.warn('[FCM] No se pudo registrar firebase-messaging-sw.js:', swErr.message);
+            return;
+        }
+
+        const token = await _messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
         if (!token) return;
         await _db.collection('usuarios').doc(user.uid).set({
             fcmToken: token,
@@ -8002,12 +8015,22 @@ _auth.onAuthStateChanged(async (user) => {
     }
 });
 
-// ── Registrar Service Worker (PWA) ──
+// ── Registrar Service Workers (PWA + FCM) ──
+// sw.js        → caché offline y estrategia Network First
+// firebase-messaging-sw.js → notificaciones push en background (FCM)
+// Ambos deben estar registrados para que la app funcione correctamente
+// en TODOS los dispositivos, no solo en el del administrador.
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js')
-            .then(reg => console.log('[PWA] SW registrado:', reg.scope))
-            .catch(err => console.warn('[PWA] SW falló:', err));
+        // 1. SW principal de la PWA
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('[PWA] SW principal registrado:', reg.scope))
+            .catch(err => console.warn('[PWA] SW principal falló:', err));
+
+        // 2. SW de Firebase Messaging (necesario para getToken en otros dispositivos)
+        navigator.serviceWorker.register('./firebase-messaging-sw.js')
+            .then(reg => console.log('[FCM-SW] Messaging SW registrado:', reg.scope))
+            .catch(err => console.warn('[FCM-SW] Messaging SW falló:', err));
     });
 }
 
