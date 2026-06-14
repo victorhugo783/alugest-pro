@@ -7594,9 +7594,9 @@ async function adminCargarListaUsuarios() {
             const dotOnline = estaOnline
                 ? '<span style="width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0;box-shadow:0 0 0 2px rgba(22,163,74,0.25);animation:pulse 2s infinite"></span>'
                 : '<span style="width:8px;height:8px;border-radius:50%;background:var(--surface3);flex-shrink:0"></span>';
-            return `<div class="card" onclick="adminVerUsuario('${uid}')"
+            return `<div class="card" onclick="adminVerUsuario('${uid}')" data-uid="${uid}" data-nombre="${nombreMostrar.replace(/"/g,'&quot;')}"
                 style="margin-bottom:8px;padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;transition:transform .12s,box-shadow .12s${esInvitado?';border-left:3px solid rgba(99,102,241,0.4)':''};user-select:none;-webkit-user-select:none"
-                onpointerdown="_adminLongPressStart(event,'${uid}','${nombreMostrar.replace(/'/g,\"\\\'\")}')" onpointerup="_adminLongPressEnd(event)" onpointercancel="_adminLongPressEnd(event)">
+                onpointerdown="_adminLongPressStart(event,this)" onpointerup="_adminLongPressEnd(event)" onpointercancel="_adminLongPressEnd(event)">
                 <div style="flex:1;min-width:0">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
                         ${dotOnline}
@@ -7791,13 +7791,14 @@ function adminToggleSesDetalle(id) {
 
 // ── Long-press en lista de usuarios: menú contextual ──
 let _adminLpTimer = null;
-function _adminLongPressStart(e, uid, nombre) {
-    const card = e.currentTarget;
+function _adminLongPressStart(e, cardEl) {
+    const card = cardEl || e.currentTarget;
+    const uid    = card.dataset.uid;
+    const nombre = card.dataset.nombre || uid;
     card.style.transform = 'scale(.98)';
     _adminLpTimer = setTimeout(() => {
         _adminLpTimer = null;
         card.style.transform = '';
-        // Vibración / tono de confirmación
         if (navigator.vibrate) navigator.vibrate([30, 20, 30]);
         _adminMostrarMenuUsuario(uid, nombre, e.clientX, e.clientY);
     }, 600);
@@ -7817,6 +7818,7 @@ function _adminMostrarMenuUsuario(uid, nombre, cx, cy) {
 
     const menu = document.createElement('div');
     menu.id = '_admin-ctx-menu';
+    menu.dataset.nombre = nombre;
     menu.style.cssText = `
         position:fixed;z-index:9999;
         background:var(--surface2,#1e293b);
@@ -7845,7 +7847,7 @@ function _adminMostrarMenuUsuario(uid, nombre, cx, cy) {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
             Ver detalle
         </button>
-        <button onclick="_adminEliminarDesdeMenu('${uid}','${nombre.replace(/'/g,"\'")}');document.getElementById('_admin-ctx-menu').remove()"
+        <button onclick="_adminEliminarDesdeMenu('${uid}',this.closest('#_admin-ctx-menu').dataset.nombre);document.getElementById('_admin-ctx-menu').remove()"
             style="width:100%;display:flex;align-items:center;gap:10px;background:none;border:none;color:var(--danger,#f87171);font-size:14px;padding:10px 12px;border-radius:10px;cursor:pointer;text-align:left"
             onpointerenter="this.style.background='rgba(248,113,113,0.08)'" onpointerleave="this.style.background='none'">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
