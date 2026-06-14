@@ -7490,11 +7490,42 @@ async function adminCargarListaUsuarios() {
         }
 
         // Filtrar admin del listado (por email Y por uid)
+        // ── GUEST GROUPING: agrupa UIDs anónimos del mismo dispositivo ──
+        // Los invitados generan un UID anónimo nuevo por sesión, pero comparten
+        // el mismo deviceFingerprint (guardado en localStorage del dispositivo).
+        // Aquí colapsamos todos sus UIDs en una sola entrada visual.
+        const fpMap = {};   // fingerprint → uid representante (el más reciente)
         const usuariosMap = {};
+        // Primero pasada: registrar todos los usuarios normales y detectar fps de invitados
         usuSnap.docs.forEach(d => {
             const u = { uid: d.id, ...d.data() };
             if (u.email === ADMIN_EMAIL || u.uid === adminUid) return;
-            usuariosMap[u.uid] = u;
+            if (u.isAnonymous && u.deviceFingerprint) {
+                const fp = u.deviceFingerprint;
+                if (!fpMap[fp]) {
+                    // Primera vez que vemos este fingerprint: registrar como entrada maestra
+                    fpMap[fp] = u.uid;
+                    usuariosMap[u.uid] = { ...u, _guestVisitas: 1, _guestUids: [u.uid] };
+                } else {
+                    // Ya existe una entrada para este dispositivo: acumular
+                    const masterUid = fpMap[fp];
+                    const master = usuariosMap[masterUid];
+                    if (master) {
+                        master._guestVisitas = (master._guestVisitas || 1) + 1;
+                        master._guestUids.push(u.uid);
+                        // Quedarnos con el lastSeen más reciente para mostrar última visita
+                        const masterTs = master.lastSeen?.toMillis ? master.lastSeen.toMillis() : 0;
+                        const thisTs   = u.lastSeen?.toMillis     ? u.lastSeen.toMillis()     : 0;
+                        if (thisTs > masterTs) {
+                            master.lastSeen = u.lastSeen;
+                            // Actualizar también en sesMap: apuntar sesiones de este uid al master
+                        }
+                    }
+                    return; // no agregar este uid como entrada separada
+                }
+            } else {
+                usuariosMap[u.uid] = u;
+            }
         });
 
         // ── CORRECCIÓN: incluir usuarios que tienen sesiones pero NO tienen
@@ -7502,7 +7533,11 @@ async function adminCargarListaUsuarios() {
         //    guardara su doc, o hubo un error al crearlo).
         //    Se reconstruyen desde sus datos de sesión. ──
         Object.entries(sesMap).forEach(([uid, slist]) => {
-            if (usuariosMap[uid]) return;          // ya está, no duplicar
+            // Si este uid ya está en el map directamente, no duplicar
+            if (usuariosMap[uid]) return;
+            // Si es un uid invitado secundario (agrupado bajo otro), no duplicar
+            const yaAgrupado = Object.values(usuariosMap).some(u => u._guestUids && u._guestUids.includes(uid));
+            if (yaAgrupado) return;
             const s = slist[0];                    // sesión más reciente
             if (!s) return;
             usuariosMap[uid] = {
@@ -7512,6 +7547,7 @@ async function adminCargarListaUsuarios() {
                 _soloSesion: true           // marcador interno (no se muestra)
             };
         });
+        // ── /GUEST GROUPING ─────────────────────────────────────────────
 
         const usuarios = Object.values(usuariosMap);
 
@@ -7522,25 +7558,48 @@ async function adminCargarListaUsuarios() {
 
         // Enriquecer con datos de sesión (nombre/email puede venir de sesiones si no está en usuarios)
         el.innerHTML = usuarios.map(u => {
-            const slistAll = sesMap[u.uid]   || [];   // 90d → detectar usuarios
-            const slist30  = sesMap30[u.uid] || [];   // 30d → conteo tarjeta
+            // Para invitados agrupados: combinar sesiones de TODOS sus UIDs anónimos
+            let slistAll, slist30;
+            if (u.isAnonymous && u._guestUids && u._guestUids.length > 1) {
+                // Unir sesiones de todos los UIDs del mismo dispositivo
+                const todasSes = u._guestUids.flatMap(gUid => sesMap[gUid] || []);
+                todasSes.sort((a, b) => b.inicio - a.inicio);
+                slistAll = todasSes;
+                slist30  = todasSes.filter(s => s.inicio > hace30);
+            } else {
+                slistAll = sesMap[u.uid]   || [];
+                slist30  = sesMap30[u.uid] || [];
+            }
             const ultima = slistAll[0];
             // displayName es el campo guardado en usuarios; nombre viene de sesiones
-            const nombreMostrar = u.displayName || (ultima ? ultima.nombre : null) || u.email || u.uid;
-            const emailMostrar  = u.email || (ultima ? ultima.email : '');
+            const esInvitado    = !!u.isAnonymous;
+            const nombreMostrar = esInvitado
+                ? 'Usuario Invitado'
+                : (u.displayName || (ultima ? ultima.nombre : null) || u.email || u.uid);
+            const emailMostrar  = esInvitado
+                ? (u._guestVisitas > 1 ? `${u._guestVisitas} visitas · mismo dispositivo` : 'Acceso de prueba (modo invitado)')
+                : (u.email || (ultima ? ultima.email : ''));
             const estaOnline = ultima && ultima.activo && (ahora - (ultima.ultimaActividad||ultima.inicio)) < INACT;
             const totalSes = slist30.length;   // solo sesiones recientes (30d)
             const ultimaFecha = ultima ? new Date(ultima.inicio).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : 'Sin sesiones';
             const uid = u.uid;
+            // Badge y color especial para invitados
+            const badgeInvitado = esInvitado
+                ? `<span style="background:rgba(99,102,241,0.15);color:#818cf8;border-radius:20px;padding:1px 7px;font-size:9px;font-family:var(--mono);font-weight:700;letter-spacing:.4px;flex-shrink:0">INVITADO</span>`
+                : '';
+            const dotOnline = estaOnline
+                ? '<span style="width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0;box-shadow:0 0 0 2px rgba(22,163,74,0.25);animation:pulse 2s infinite"></span>'
+                : '<span style="width:8px;height:8px;border-radius:50%;background:var(--surface3);flex-shrink:0"></span>';
             return `<div class="card" onclick="adminVerUsuario('${uid}')"
-                style="margin-bottom:8px;padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;transition:transform .12s,box-shadow .12s"
+                style="margin-bottom:8px;padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;transition:transform .12s,box-shadow .12s${esInvitado?';border-left:3px solid rgba(99,102,241,0.4)':''}"
                 onpointerdown="this.style.transform='scale(.98)'" onpointerup="this.style.transform=''" onpointercancel="this.style.transform=''">
                 <div style="flex:1;min-width:0">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
-                        ${estaOnline ? '<span style="width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0;box-shadow:0 0 0 2px rgba(22,163,74,0.25);animation:pulse 2s infinite"></span>' : '<span style="width:8px;height:8px;border-radius:50%;background:var(--surface3);flex-shrink:0"></span>'}
+                        ${dotOnline}
                         <span style="font-weight:700;font-size:15px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nombreMostrar}</span>
+                        ${badgeInvitado}
                     </div>
-                    <div style="font-size:10px;font-family:var(--mono);color:var(--text3)">${emailMostrar}</div>
+                    <div style="font-size:10px;font-family:var(--mono);color:${esInvitado?'#818cf8':'var(--text3)'};">${emailMostrar}</div>
                     <div style="font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:2px">
                         ${totalSes} sesión${totalSes!==1?'es':''} (30d) · última: ${ultimaFecha}
                     </div>
@@ -7587,9 +7646,14 @@ async function adminVerUsuario(uid) {
         const eventos = evSnap.docs.map(d => ({ ...d.data(), _id: d.id }))
             .sort((a, b) => b.ts - a.ts);
 
-        // Nombre a mostrar: displayName (campo de usuarios) o nombre (campo de sesiones)
-        const nombreMostrar = u.displayName || (sesiones[0] ? sesiones[0].nombre : null) || u.email || uid;
-        const emailMostrar  = u.email || (sesiones[0] ? sesiones[0].email : '');
+        // Nombre a mostrar: distinguir invitados de usuarios normales
+        const esInvitadoDet  = !!u.isAnonymous;
+        const nombreMostrar  = esInvitadoDet
+            ? 'Usuario Invitado'
+            : (u.displayName || (sesiones[0] ? sesiones[0].nombre : null) || u.email || uid);
+        const emailMostrar   = esInvitadoDet
+            ? (u.deviceFingerprint ? `Dispositivo: ${u.deviceFingerprint}` : 'Acceso de prueba (modo invitado)')
+            : (u.email || (sesiones[0] ? sesiones[0].email : ''));
 
         const ultimaSes = sesiones[0];
         const estaOnline = ultimaSes && ultimaSes.activo && (ahora - (ultimaSes.ultimaActividad||ultimaSes.inicio)) < INACT;
@@ -7605,12 +7669,15 @@ async function adminVerUsuario(uid) {
 
         // Encabezado de usuario
         const headerHTML = `
-        <div class="card" style="margin-bottom:10px;padding:14px 16px">
+        <div class="card" style="margin-bottom:10px;padding:14px 16px${esInvitadoDet?';border-left:3px solid rgba(99,102,241,0.5)':''}">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-                <div style="width:44px;height:44px;border-radius:50%;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">👤</div>
+                <div style="width:44px;height:44px;border-radius:50%;background:${esInvitadoDet?'rgba(99,102,241,0.15)':'var(--accent-dim)'};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">${esInvitadoDet?'🔍':'👤'}</div>
                 <div style="flex:1;min-width:0">
-                    <div style="font-size:17px;font-weight:800;color:var(--text)">${nombreMostrar}</div>
-                    <div style="font-size:11px;font-family:var(--mono);color:var(--text3)">${emailMostrar}</div>
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                        <div style="font-size:17px;font-weight:800;color:var(--text)">${nombreMostrar}</div>
+                        ${esInvitadoDet ? '<span style="background:rgba(99,102,241,0.15);color:#818cf8;border-radius:20px;padding:2px 8px;font-size:9px;font-family:var(--mono);font-weight:700;letter-spacing:.4px">INVITADO</span>' : ''}
+                    </div>
+                    <div style="font-size:11px;font-family:var(--mono);color:${esInvitadoDet?'#818cf8':'var(--text3)'};margin-top:2px">${emailMostrar}</div>
                     ${estaOnline ? '<div style="font-size:11px;font-family:var(--mono);color:var(--success);margin-top:2px">🟢 En línea ahora</div>' : ''}
                 </div>
             </div>

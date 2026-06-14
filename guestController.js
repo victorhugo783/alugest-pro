@@ -769,6 +769,30 @@ const GuestController = (() => {
           await auth.signInAnonymously();        // dispara onAuthStateChanged →
           // onAuthStateChanged detecta _guestAnonAuth y aborta el flujo normal;
           // el catálogo se carga a continuación con las credenciales activas.
+
+          // ── GUEST IDENTITY ──────────────────────────────────────────────
+          // Fingerprint estable por dispositivo almacenado en localStorage.
+          // Permite que el panel admin identifique visitas repetidas del mismo
+          // dispositivo sin depender del UID anónimo (que cambia cada sesión).
+          const FP_KEY = 'alugest_guest_fp';
+          let fp = localStorage.getItem(FP_KEY);
+          if (!fp) {
+            fp = 'gfp_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+            localStorage.setItem(FP_KEY, fp);
+          }
+          const guestUser = auth.currentUser;
+          if (guestUser) {
+            try {
+              await firebase.firestore().collection('usuarios').doc(guestUser.uid).set({
+                displayName:       'Usuario Invitado',
+                email:             null,
+                isAnonymous:       true,
+                deviceFingerprint: fp,
+                lastSeen:          firebase.firestore.FieldValue.serverTimestamp()
+              }, { merge: true });
+            } catch (_e) { /* falla silenciosa — no bloquear la carga */ }
+          }
+          // ── /GUEST IDENTITY ─────────────────────────────────────────────
         }
         await fbLoadCatalogo();
       } catch(e) {
