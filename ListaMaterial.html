@@ -193,10 +193,6 @@
             70%  { transform: scale(1.03); }
             100% { transform: scale(1); opacity: 1; }
         }
-        @keyframes fadeInScale {
-            from { opacity:0; transform:scale(.92); }
-            to   { opacity:1; transform:scale(1); }
-        }
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50%       { opacity: 0.55; }
@@ -7594,9 +7590,9 @@ async function adminCargarListaUsuarios() {
             const dotOnline = estaOnline
                 ? '<span style="width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0;box-shadow:0 0 0 2px rgba(22,163,74,0.25);animation:pulse 2s infinite"></span>'
                 : '<span style="width:8px;height:8px;border-radius:50%;background:var(--surface3);flex-shrink:0"></span>';
-            return `<div class="card" onclick="adminVerUsuario('${uid}')" data-uid="${uid}" data-nombre="${nombreMostrar.replace(/"/g,'&quot;')}"
-                style="margin-bottom:8px;padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;transition:transform .12s,box-shadow .12s${esInvitado?';border-left:3px solid rgba(99,102,241,0.4)':''};user-select:none;-webkit-user-select:none"
-                onpointerdown="_adminLongPressStart(event,this)" onpointerup="_adminLongPressEnd(event)" onpointercancel="_adminLongPressEnd(event)">
+            return `<div class="card" onclick="adminVerUsuario('${uid}')"
+                style="margin-bottom:8px;padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;transition:transform .12s,box-shadow .12s${esInvitado?';border-left:3px solid rgba(99,102,241,0.4)':''}"
+                onpointerdown="this.style.transform='scale(.98)'" onpointerup="this.style.transform=''" onpointercancel="this.style.transform=''">
                 <div style="flex:1;min-width:0">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
                         ${dotOnline}
@@ -7787,87 +7783,6 @@ function adminToggleSesDetalle(id) {
     const open = el.style.display !== 'none';
     el.style.display = open ? 'none' : '';
     if (chev) chev.style.transform = open ? '' : 'rotate(180deg)';
-}
-
-// ── Long-press en lista de usuarios: menú contextual ──
-let _adminLpTimer = null;
-function _adminLongPressStart(e, cardEl) {
-    const card = cardEl || e.currentTarget;
-    const uid    = card.dataset.uid;
-    const nombre = card.dataset.nombre || uid;
-    card.style.transform = 'scale(.98)';
-    _adminLpTimer = setTimeout(() => {
-        _adminLpTimer = null;
-        card.style.transform = '';
-        if (navigator.vibrate) navigator.vibrate([30, 20, 30]);
-        _adminMostrarMenuUsuario(uid, nombre, e.clientX, e.clientY);
-    }, 600);
-}
-function _adminLongPressEnd(e) {
-    const card = e.currentTarget;
-    if (_adminLpTimer) {
-        clearTimeout(_adminLpTimer);
-        _adminLpTimer = null;
-        card.style.transform = '';
-    }
-}
-function _adminMostrarMenuUsuario(uid, nombre, cx, cy) {
-    // Eliminar menú previo si existe
-    const prev = document.getElementById('_admin-ctx-menu');
-    if (prev) prev.remove();
-
-    const menu = document.createElement('div');
-    menu.id = '_admin-ctx-menu';
-    menu.dataset.nombre = nombre;
-    menu.style.cssText = `
-        position:fixed;z-index:9999;
-        background:var(--surface2,#1e293b);
-        border:1px solid rgba(255,255,255,0.08);
-        border-radius:14px;
-        box-shadow:0 8px 32px rgba(0,0,0,0.45);
-        padding:6px;
-        min-width:200px;
-        animation:fadeInScale .15s ease;
-    `;
-
-    // Posición: centrado en pantalla si toca borde
-    const W = window.innerWidth, H = window.innerHeight;
-    let left = Math.min(cx, W - 220);
-    let top  = Math.min(cy, H - 120);
-    menu.style.left = left + 'px';
-    menu.style.top  = top  + 'px';
-
-    const labelNombre = nombre.length > 22 ? nombre.slice(0,20)+'…' : nombre;
-
-    menu.innerHTML = `
-        <div style="font-size:10px;font-family:var(--mono,monospace);color:var(--text3,#94a3b8);padding:6px 10px 4px;letter-spacing:.5px;border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:4px">${labelNombre}</div>
-        <button onclick="adminVerUsuario('${uid}');document.getElementById('_admin-ctx-menu').remove()"
-            style="width:100%;display:flex;align-items:center;gap:10px;background:none;border:none;color:var(--text,#f1f5f9);font-size:14px;padding:10px 12px;border-radius:10px;cursor:pointer;text-align:left"
-            onpointerenter="this.style.background='var(--surface3,#334155)'" onpointerleave="this.style.background='none'">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-            Ver detalle
-        </button>
-        <button onclick="_adminEliminarDesdeMenu('${uid}',this.closest('#_admin-ctx-menu').dataset.nombre);document.getElementById('_admin-ctx-menu').remove()"
-            style="width:100%;display:flex;align-items:center;gap:10px;background:none;border:none;color:var(--danger,#f87171);font-size:14px;padding:10px 12px;border-radius:10px;cursor:pointer;text-align:left"
-            onpointerenter="this.style.background='rgba(248,113,113,0.08)'" onpointerleave="this.style.background='none'">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-            Eliminar registros
-        </button>
-    `;
-
-    // Cerrar al tocar fuera
-    const cerrar = (ev) => {
-        if (!menu.contains(ev.target)) {
-            menu.remove();
-            document.removeEventListener('pointerdown', cerrar);
-        }
-    };
-    setTimeout(() => document.addEventListener('pointerdown', cerrar), 50);
-
-    document.body.appendChild(menu);
-}
-async function _adminEliminarDesdeMenu(uid, nombre) {
-    await adminBorrarUsuarioCompleto(uid, nombre);
 }
 
 // ── Borrar una sesión individual ──
