@@ -193,6 +193,10 @@
             70%  { transform: scale(1.03); }
             100% { transform: scale(1); opacity: 1; }
         }
+        @keyframes fadeInScale {
+            from { opacity:0; transform:scale(.92); }
+            to   { opacity:1; transform:scale(1); }
+        }
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50%       { opacity: 0.55; }
@@ -6810,6 +6814,13 @@ function adminTab(tab) {
     if (titleEl) titleEl.textContent = titles[tab] || 'Panel Admin';
     if (tab === 'dashboard')      adminCargarDashboard();
     if (tab === 'usuarios')       adminCargarListaUsuarios();
+    // Limpiar modo selección al cambiar de tab
+    if (tab !== 'usuarios' && typeof _adminModoSeleccion !== 'undefined' && _adminModoSeleccion) {
+        _adminModoSeleccion = false;
+        _adminSeleccionados.clear();
+        const barra = document.getElementById('_admin-barra-elim');
+        if (barra) barra.remove();
+    }
     if (tab === 'eventos')        { _adminEventosCache = []; _adminEventosFiltro = 'todos'; _adminEventosUsuario = ''; adminCargarEventos(); }
 }
 
@@ -7556,12 +7567,22 @@ async function adminCargarListaUsuarios() {
             return;
         }
 
-        // Enriquecer con datos de sesión (nombre/email puede venir de sesiones si no está en usuarios)
+        // ── Botón "Seleccionar" en cabecera de lista ──
+        const headerBar = document.getElementById('admin-users-header-bar');
+        if (headerBar && !headerBar.querySelector('#btn-select-users')) {
+            const btnSel = document.createElement('button');
+            btnSel.id = 'btn-select-users';
+            btnSel.textContent = 'Seleccionar';
+            btnSel.style.cssText = 'background:none;border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:var(--text3);font-size:12px;padding:4px 10px;cursor:pointer;flex-shrink:0';
+            btnSel.onclick = () => _adminToggleSeleccion();
+            headerBar.appendChild(btnSel);
+        }
+
+        // Enriquecer con datos de sesión
+        window._adminUsuariosData = {};  // cache uid→nombre para selección múltiple
         el.innerHTML = usuarios.map(u => {
-            // Para invitados agrupados: combinar sesiones de TODOS sus UIDs anónimos
             let slistAll, slist30;
             if (u.isAnonymous && u._guestUids && u._guestUids.length > 1) {
-                // Unir sesiones de todos los UIDs del mismo dispositivo
                 const todasSes = u._guestUids.flatMap(gUid => sesMap[gUid] || []);
                 todasSes.sort((a, b) => b.inicio - a.inicio);
                 slistAll = todasSes;
@@ -7571,7 +7592,6 @@ async function adminCargarListaUsuarios() {
                 slist30  = sesMap30[u.uid] || [];
             }
             const ultima = slistAll[0];
-            // displayName es el campo guardado en usuarios; nombre viene de sesiones
             const esInvitado    = !!u.isAnonymous;
             const nombreMostrar = esInvitado
                 ? 'Usuario Invitado'
@@ -7580,19 +7600,24 @@ async function adminCargarListaUsuarios() {
                 ? (u._guestVisitas > 1 ? `${u._guestVisitas} visitas · mismo dispositivo` : 'Acceso de prueba (modo invitado)')
                 : (u.email || (ultima ? ultima.email : ''));
             const estaOnline = ultima && ultima.activo && (ahora - (ultima.ultimaActividad||ultima.inicio)) < INACT;
-            const totalSes = slist30.length;   // solo sesiones recientes (30d)
+            const totalSes = slist30.length;
             const ultimaFecha = ultima ? new Date(ultima.inicio).toLocaleString('es-MX',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : 'Sin sesiones';
             const uid = u.uid;
-            // Badge y color especial para invitados
+            // Cache para la barra de selección
+            window._adminUsuariosData[uid] = nombreMostrar;
             const badgeInvitado = esInvitado
                 ? `<span style="background:rgba(99,102,241,0.15);color:#818cf8;border-radius:20px;padding:1px 7px;font-size:9px;font-family:var(--mono);font-weight:700;letter-spacing:.4px;flex-shrink:0">INVITADO</span>`
                 : '';
             const dotOnline = estaOnline
                 ? '<span style="width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0;box-shadow:0 0 0 2px rgba(22,163,74,0.25);animation:pulse 2s infinite"></span>'
                 : '<span style="width:8px;height:8px;border-radius:50%;background:var(--surface3);flex-shrink:0"></span>';
-            return `<div class="card" onclick="adminVerUsuario('${uid}')"
-                style="margin-bottom:8px;padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;transition:transform .12s,box-shadow .12s${esInvitado?';border-left:3px solid rgba(99,102,241,0.4)':''}"
-                onpointerdown="this.style.transform='scale(.98)'" onpointerup="this.style.transform=''" onpointercancel="this.style.transform=''">
+            return `<div class="admin-user-card card"
+                data-uid="${uid}"
+                data-nombre="${nombreMostrar.replace(/"/g,'&quot;')}"
+                onclick="_adminCardClick(event,'${uid}')"
+                style="margin-bottom:8px;padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;transition:transform .12s,box-shadow .12s,background .15s${esInvitado?';border-left:3px solid rgba(99,102,241,0.4)':''};user-select:none;-webkit-user-select:none"
+                onpointerdown="_adminLongPressStart(event,this)" onpointerup="_adminLongPressEnd(event)" onpointercancel="_adminLongPressEnd(event)">
+                <div class="admin-card-check" style="display:none;width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,0.25);flex-shrink:0;align-items:center;justify-content:center;transition:background .15s,border-color .15s"></div>
                 <div style="flex:1;min-width:0">
                     <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
                         ${dotOnline}
@@ -7604,7 +7629,7 @@ async function adminCargarListaUsuarios() {
                         ${totalSes} sesión${totalSes!==1?'es':''} (30d) · última: ${ultimaFecha}
                     </div>
                 </div>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+                <div class="admin-card-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>
             </div>`;
         }).join('');
 
@@ -7785,6 +7810,166 @@ function adminToggleSesDetalle(id) {
     if (chev) chev.style.transform = open ? '' : 'rotate(180deg)';
 }
 
+// ── Selección múltiple de usuarios ──
+let _adminModoSeleccion = false;
+const _adminSeleccionados = new Set();
+
+function _adminToggleSeleccion() {
+    _adminModoSeleccion = !_adminModoSeleccion;
+    _adminSeleccionados.clear();
+    const btn = document.getElementById('btn-select-users');
+    if (btn) btn.textContent = _adminModoSeleccion ? 'Cancelar' : 'Seleccionar';
+    document.querySelectorAll('.admin-user-card').forEach(card => {
+        const check = card.querySelector('.admin-card-check');
+        const arrow = card.querySelector('.admin-card-arrow');
+        if (check) check.style.display = _adminModoSeleccion ? 'flex' : 'none';
+        if (arrow) arrow.style.display = _adminModoSeleccion ? 'none' : '';
+        card.style.background = '';
+        check && (check.style.background = '');
+        check && (check.style.borderColor = 'rgba(255,255,255,0.25)');
+        check && (check.innerHTML = '');
+    });
+    _adminActualizarBarraElim();
+}
+
+function _adminCardClick(e, uid) {
+    if (!_adminModoSeleccion) { adminVerUsuario(uid); return; }
+    const card = e.currentTarget;
+    const check = card.querySelector('.admin-card-check');
+    if (_adminSeleccionados.has(uid)) {
+        _adminSeleccionados.delete(uid);
+        card.style.background = '';
+        if (check) { check.style.background=''; check.style.borderColor='rgba(255,255,255,0.25)'; check.innerHTML=''; }
+    } else {
+        _adminSeleccionados.add(uid);
+        card.style.background = 'rgba(248,113,113,0.07)';
+        if (check) {
+            check.style.background = 'var(--danger,#f87171)';
+            check.style.borderColor = 'var(--danger,#f87171)';
+            check.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+        }
+    }
+    _adminActualizarBarraElim();
+}
+
+function _adminActualizarBarraElim() {
+    let barra = document.getElementById('_admin-barra-elim');
+    if (!_adminModoSeleccion || _adminSeleccionados.size === 0) {
+        if (barra) barra.style.transform = 'translateY(100%)';
+        return;
+    }
+    if (!barra) {
+        barra = document.createElement('div');
+        barra.id = '_admin-barra-elim';
+        barra.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9998;background:var(--surface2,#1e293b);border-top:1px solid rgba(248,113,113,0.3);padding:14px 16px calc(14px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:12px;transition:transform .25s cubic-bezier(.4,0,.2,1);transform:translateY(100%)';
+        barra.innerHTML = `
+            <span id="_admin-barra-count" style="flex:1;font-size:14px;color:var(--text3)"></span>
+            <button onclick="_adminEliminarSeleccionados()"
+                style="background:var(--danger,#f87171);border:none;border-radius:10px;color:white;font-size:14px;font-weight:700;padding:10px 20px;cursor:pointer;display:flex;align-items:center;gap:8px">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                Eliminar
+            </button>`;
+        document.body.appendChild(barra);
+    }
+    const count = document.getElementById('_admin-barra-count');
+    if (count) count.textContent = `${_adminSeleccionados.size} seleccionado${_adminSeleccionados.size!==1?'s':''}`;
+    requestAnimationFrame(() => { barra.style.transform = 'translateY(0)'; });
+}
+
+async function _adminEliminarSeleccionados() {
+    const uids = [..._adminSeleccionados];
+    if (!uids.length) return;
+    const nombres = uids.map(u => window._adminUsuariosData?.[u] || u).join(', ');
+    const ok = await _dialog(`¿Eliminar ${uids.length} usuario${uids.length!==1?'s':''}?\n\n${nombres}\n\nEsto borrará sus sesiones, eventos y documentos. No se puede deshacer.`, ['Eliminar todo', 'Cancelar']);
+    if (!ok || ok === 'Cancelar') return;
+    // Salir de modo selección primero
+    _adminModoSeleccion = false;
+    _adminSeleccionados.clear();
+    const barra = document.getElementById('_admin-barra-elim');
+    if (barra) barra.remove();
+    // Borrar todos los UIDs en paralelo
+    await _adminBorrarUids(uids, `${uids.length} usuario${uids.length!==1?'s':''}`);
+}
+
+// ── Long-press en lista de usuarios: menú contextual ──
+let _adminLpTimer = null;
+function _adminLongPressStart(e, uid, nombre) {
+    const card = e.currentTarget;
+    card.style.transform = 'scale(.98)';
+    _adminLpTimer = setTimeout(() => {
+        _adminLpTimer = null;
+        card.style.transform = '';
+        // Vibración / tono de confirmación
+        if (navigator.vibrate) navigator.vibrate([30, 20, 30]);
+        _adminMostrarMenuUsuario(uid, nombre, e.clientX, e.clientY);
+    }, 600);
+}
+function _adminLongPressEnd(e) {
+    const card = e.currentTarget;
+    if (_adminLpTimer) {
+        clearTimeout(_adminLpTimer);
+        _adminLpTimer = null;
+        card.style.transform = '';
+    }
+}
+function _adminMostrarMenuUsuario(uid, nombre, cx, cy) {
+    // Eliminar menú previo si existe
+    const prev = document.getElementById('_admin-ctx-menu');
+    if (prev) prev.remove();
+
+    const menu = document.createElement('div');
+    menu.id = '_admin-ctx-menu';
+    menu.style.cssText = `
+        position:fixed;z-index:9999;
+        background:var(--surface2,#1e293b);
+        border:1px solid rgba(255,255,255,0.08);
+        border-radius:14px;
+        box-shadow:0 8px 32px rgba(0,0,0,0.45);
+        padding:6px;
+        min-width:200px;
+        animation:fadeInScale .15s ease;
+    `;
+
+    // Posición: centrado en pantalla si toca borde
+    const W = window.innerWidth, H = window.innerHeight;
+    let left = Math.min(cx, W - 220);
+    let top  = Math.min(cy, H - 120);
+    menu.style.left = left + 'px';
+    menu.style.top  = top  + 'px';
+
+    const labelNombre = nombre.length > 22 ? nombre.slice(0,20)+'…' : nombre;
+
+    menu.innerHTML = `
+        <div style="font-size:10px;font-family:var(--mono,monospace);color:var(--text3,#94a3b8);padding:6px 10px 4px;letter-spacing:.5px;border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:4px">${labelNombre}</div>
+        <button onclick="adminVerUsuario('${uid}');document.getElementById('_admin-ctx-menu').remove()"
+            style="width:100%;display:flex;align-items:center;gap:10px;background:none;border:none;color:var(--text,#f1f5f9);font-size:14px;padding:10px 12px;border-radius:10px;cursor:pointer;text-align:left"
+            onpointerenter="this.style.background='var(--surface3,#334155)'" onpointerleave="this.style.background='none'">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+            Ver detalle
+        </button>
+        <button onclick="_adminEliminarDesdeMenu('${uid}','${nombre.replace(/'/g,"\'")}');document.getElementById('_admin-ctx-menu').remove()"
+            style="width:100%;display:flex;align-items:center;gap:10px;background:none;border:none;color:var(--danger,#f87171);font-size:14px;padding:10px 12px;border-radius:10px;cursor:pointer;text-align:left"
+            onpointerenter="this.style.background='rgba(248,113,113,0.08)'" onpointerleave="this.style.background='none'">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+            Eliminar registros
+        </button>
+    `;
+
+    // Cerrar al tocar fuera
+    const cerrar = (ev) => {
+        if (!menu.contains(ev.target)) {
+            menu.remove();
+            document.removeEventListener('pointerdown', cerrar);
+        }
+    };
+    setTimeout(() => document.addEventListener('pointerdown', cerrar), 50);
+
+    document.body.appendChild(menu);
+}
+async function _adminEliminarDesdeMenu(uid, nombre) {
+    await adminBorrarUsuarioCompleto(uid, nombre);
+}
+
 // ── Borrar una sesión individual ──
 async function adminBorrarSesion(sesionId, uid) {
     if (!sesionId) { showToast('ID de sesión no disponible', 'info'); return; }
@@ -7808,23 +7993,42 @@ async function adminBorrarSesion(sesionId, uid) {
 
 // ── Borrar todos los registros de un usuario ──
 async function adminBorrarUsuarioCompleto(uid, nombre) {
-    const ok = await _dialog(`¿Borrar TODAS las sesiones y eventos de "${nombre}"?\n\nEsto eliminará su historial completo de los reportes. No se puede deshacer.`, ['Borrar todo', 'Cancelar']);
+    const ok = await _dialog(`¿Borrar TODAS las sesiones y eventos de "${nombre}"?\n\nEsto eliminará su historial completo y el usuario desaparecerá de la lista. No se puede deshacer.`, ['Borrar todo', 'Cancelar']);
     if (!ok || ok === 'Cancelar') return;
+    await _adminBorrarUids([uid], nombre);
+}
+
+// Borrar uno o varios UIDs (incluyendo UIDs anónimos agrupados del mismo dispositivo)
+async function _adminBorrarUids(uids, label) {
     showToast('Borrando registros...', 'info');
     try {
-        // Borrar sesiones
-        const sesSnap = await _db.collection('sesiones').where('uid','==',uid).get();
-        // Borrar eventos_global
-        const evSnap = await _db.collection('eventos_global').where('uid','==',uid).get();
+        const docsABorrar = [];
+        for (const uid of uids) {
+            // Obtener UIDs anónimos agrupados bajo este uid (invitados multi-sesión)
+            const uidsABorrar = [uid];
+            const uDoc = await _db.collection('usuarios').doc(uid).get();
+            const uData = uDoc.exists ? uDoc.data() : null;
+            if (uData && uData._guestUids) uidsABorrar.push(...uData._guestUids.filter(x => x !== uid));
 
-        // Borrar en batches de 500
-        const docsABorrar = [...sesSnap.docs, ...evSnap.docs];
+            for (const u of uidsABorrar) {
+                const [ses, ev] = await Promise.all([
+                    _db.collection('sesiones').where('uid','==',u).get(),
+                    _db.collection('eventos_global').where('uid','==',u).get()
+                ]);
+                docsABorrar.push(...ses.docs, ...ev.docs);
+                // Marcar doc de usuario para borrar
+                const uRef = _db.collection('usuarios').doc(u);
+                const exists = await uRef.get();
+                if (exists.exists) docsABorrar.push(exists);
+            }
+        }
+        // Ejecutar borrado en lotes de 400
         for (let i = 0; i < docsABorrar.length; i += 400) {
             const batch = _db.batch();
             docsABorrar.slice(i, i+400).forEach(d => batch.delete(d.ref));
             await batch.commit();
         }
-        showToast(`✓ Registros de "${nombre}" eliminados`, 'success');
+        showToast(`✓ ${label} eliminado${uids.length > 1 ? 's' : ''}`, 'success');
         adminTab('usuarios');
     } catch(e) {
         showToast('Error al borrar: ' + e.message, 'info');
@@ -8166,7 +8370,9 @@ init();
         <!-- En línea ahora (badge pequeño) -->
         <div id="admin-online-strip" style="margin-bottom:10px"></div>
         <!-- Lista de usuarios registrados -->
-        <div class="section-divider-label" style="margin-bottom:8px">USUARIOS REGISTRADOS</div>
+        <div id="admin-users-header-bar" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div class="section-divider-label" style="margin-bottom:0">USUARIOS REGISTRADOS</div>
+        </div>
         <div id="admin-users-list" style="min-height:60px;margin-bottom:80px">
             <div class="card" style="text-align:center;color:var(--text3);font-size:12px;font-family:var(--mono);padding:18px">Cargando...</div>
         </div>
